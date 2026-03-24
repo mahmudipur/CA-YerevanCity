@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-Full pipeline: fetch → split → CSV report.
+Full split pipeline — choose between a Yerevan City order or a manual expense.
 
 Usage:
-  python tools/run.py            # fetch latest order (cached if already fetched today)
-  python tools/run.py --refresh  # force re-fetch from API
+  python tools/run.py            # interactive menu
+  python tools/run.py --refresh  # YC order: force re-fetch from API
 """
 
 import sys
@@ -14,23 +14,51 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 import fetch_order
 import split_basket
+import manual_split
 import generate_csv
+
+SEP = "─" * 60
+
+
+def _prompt(text: str) -> str:
+    try:
+        return input(text).strip()
+    except (KeyboardInterrupt, EOFError):
+        print("\nAborted.")
+        sys.exit(0)
+
+
+def run_yc(refresh: bool = False) -> None:
+    order_id = fetch_order.main(refresh=refresh)
+    sys.argv  = [sys.argv[0], order_id]
+    split_basket.main()
+    generate_csv.main()
+
+
+def run_manual() -> None:
+    slug     = manual_split.main()
+    sys.argv = [sys.argv[0], slug]
+    generate_csv.main()
 
 
 def main() -> None:
     refresh = "--refresh" in sys.argv
 
-    # Step 1 — fetch latest order
-    order_id = fetch_order.main(refresh=refresh)
+    print(f"\n{SEP}")
+    print("  What would you like to split?")
+    print("  [1] Yerevan City order")
+    print("  [2] Manual expense  (restaurant, cafe, etc.)")
+    print(f"{SEP}")
 
-    # Steps 2 & 3 — need order_id in sys.argv
-    sys.argv = [sys.argv[0], order_id]
-
-    # Step 2 — interactive split
-    split_basket.main()
-
-    # Step 3 — generate CSV
-    generate_csv.main()
+    while True:
+        choice = _prompt("  Choice: ")
+        if choice in ("1", ""):
+            run_yc(refresh=refresh)
+            break
+        if choice == "2":
+            run_manual()
+            break
+        print("  [!] Enter 1 or 2.")
 
 
 if __name__ == "__main__":

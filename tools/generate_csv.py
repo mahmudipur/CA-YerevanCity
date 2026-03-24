@@ -126,7 +126,7 @@ def main() -> None:
                       for p in participants}
             weights = display_weights(aw, participants)
             amounts = exact_amounts(aw, participants, it["net_price"])
-            w.writerow([it["name"], it["net_price"], 0] + weights + amounts + [""])
+            w.writerow([it["name"], it.get("price", it["net_price"]), it.get("service", 0)] + weights + amounts + [""])
 
         # Blank separator
         w.writerow([""] * (TOTAL_DATA + 1))
