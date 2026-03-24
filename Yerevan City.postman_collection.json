@@ -1,0 +1,188 @@
+{
+  "info": {
+    "_postman_id": "3f04998a-ff79-4ea3-bcb2-0297ef4f16d0",
+    "name": "Yerevan City",
+    "description": "``` typescript\nexport interface IResponse<T> {\n    success:   boolean;\n    data:      T;\n    messages:  Message[];\n    alertIcon: null;\n}\nexport interface Message {\n    key:   number;\n    value: string;\n}\n\n ```",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "35166190"
+  },
+  "item": [
+    {
+      "name": "ConfirmCode",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.collectionVariables.set(\"confirmCode\", pm.response.body.data);",
+              ""
+            ],
+            "type": "text/javascript",
+            "packages": {}
+          }
+        }
+      ],
+      "request": {
+        "auth": {
+          "type": "noauth"
+        },
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/Sms/ConfirmCode",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "Sms",
+            "ConfirmCode"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "SendCode",
+      "request": {
+        "auth": {
+          "type": "noauth"
+        },
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"phoneNumber\": \"55285320\",\n    \"country\": \"AM\",\n    \"deviceId\": \"1772545334253315tAyn\",\n    \"osType\": 3,\n    \"confirmCode\": \"{{confirmCode}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/Sms/SendCode",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "Sms",
+            "SendCode"
+          ]
+        },
+        "description": "shoud be used as IResponse generic type:\n\n``` typescript\ntype TSendCode = boolean\n\n ```"
+      },
+      "response": []
+    },
+    {
+      "name": "Verify",
+      "request": {
+        "auth": {
+          "type": "noauth"
+        },
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"phoneNumber\": \"+37455285320\",\n    \"code\": \"529312\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/Sms/Verify",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "Sms",
+            "Verify"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "AllOrders",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"orderOriginType\": null,\n    \"orderStatus\": null,\n    \"dateTo\": null,\n    \"page\": 1,\n    \"count\": 30,\n    \"dateFrom\": null\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/Order/UserAllOrdersPaged",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "Order",
+            "UserAllOrdersPaged"
+          ]
+        },
+        "description": "shoud be used as IResponse generic type:\n\n``` typescript\nexport interface Data {\n    list:      List[];\n    pageCount: number;\n    itemCount: number;\n    dateFrom:  null;\n}\n\nexport interface List {\n    id:              number;\n    paymentMethod:   number;\n    isDelivery:      boolean;\n    createDate:      Date;\n    totalPrice:      number;\n    status:          number;\n    totalToPay:      number;\n    address:         null;\n    userDeliveryFee: number;\n    finishDate:      Date;\n    uniqueId:        string;\n    paymentTypeLogo: string;\n    createdOn:       null;\n    orderOriginType: number;\n    offlineOrderId:  string;\n    branchAddress:   BranchAddress;\n    serviceFee:      number;\n    driverTipAmount: number;\n}\n\nexport interface BranchAddress {\n    address: string;\n    id:      string;\n}\n ```"
+      },
+      "response": []
+    },
+    {
+      "name": "GetOrderById",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"orderId\": \"KM0029977560\",\n    \"createdOn\": \"2026-03-01\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/Order/GetOfflineOrderById",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "Order",
+            "GetOfflineOrderById"
+          ]
+        }
+      },
+      "response": []
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{JWT}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "JWT",
+      "value": "nothing",
+      "type": "string"
+    },
+    {
+      "key": "baseUrl",
+      "value": "https://apishopv2.yerevan-city.am/api",
+      "type": "string"
+    },
+    {
+      "key": "confirmCode",
+      "value": "",
+      "type": "string"
+    }
+  ]
+}
