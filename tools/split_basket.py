@@ -23,6 +23,8 @@ import os
 import sys
 from datetime import datetime, timezone
 from decimal import Decimal
+from functools import reduce
+from math import gcd
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
@@ -88,24 +90,30 @@ def resolve_name(raw: str, participants: list) -> str:
 
 # ── Assignment parser ─────────────────────────────────────────────────────────
 
-def parse_assignment(text: str, participants: list, net_price: int) -> dict:
+def parse_assignment(text: str, participants: list, net_price: int) -> tuple:
     """
-    Parse the user's assignment string into {participant: amount_amd}.
-    Always sums to net_price exactly.
+    Parse the user's assignment string.
+    Returns (int_amounts, display_weights):
+      - int_amounts:      {participant: int} summing exactly to net_price (fee allocation)
+      - display_weights:  {participant: number} the natural weights to show in the CSV,
+                          exactly as entered:
+                            equal / named subset → 1 per sharing person, 0 otherwise
+                            percentage           → the pct value (e.g. 60, 40, 0)
+                            fixed AMD            → GCD-reduced integers (e.g. 2, 1, 0)
     """
     text = text.strip()
 
+    def _equal_weights(names):
+        return {p: (1 if p in names else 0) for p in participants}
+
     # Default: equal split all
     if not text or text.lower() in ("all", "a"):
-        return _equal_split(participants, net_price)
+        return _equal_split(participants, net_price), _equal_weights(participants)
 
-    # Split by comma
     parts = [p.strip() for p in text.split(",") if p.strip()]
-
     if not parts:
-        return _equal_split(participants, net_price)
+        return _equal_split(participants, net_price), _equal_weights(participants)
 
-    # Detect format: percentage vs fixed vs equal-named
     has_colon = any(":" in p for p in parts)
 
     if not has_colon:
@@ -113,7 +121,7 @@ def parse_assignment(text: str, participants: list, net_price: int) -> dict:
         names = [resolve_name(p, participants) for p in parts]
         if len(names) != len(set(names)):
             raise ValueError("Duplicate participant in assignment.")
-        return _equal_split(names, net_price)
+        return _equal_split(names, net_price), _equal_weights(names)
 
     # Has colons — percentage or fixed
     pairs = {}
@@ -139,16 +147,21 @@ def parse_assignment(text: str, participants: list, net_price: int) -> dict:
         pct_sum = sum(v for v, _ in pairs.values())
         if abs(pct_sum - 100) > 0.01:
             raise ValueError(f"Percentages sum to {pct_sum:.1f}%, must be 100%.")
-        return _pct_split({n: v for n, (v, _) in pairs.items()}, net_price)
+        pct_map = {n: v for n, (v, _) in pairs.items()}
+        weights = {p: round(pct_map.get(p, 0.0), 2) for p in participants}
+        return _pct_split(pct_map, net_price), weights
 
-    # Fixed AMD
+    # Fixed AMD — reduce to smallest integer weights via GCD
     amounts = {n: int(round(v)) for n, (v, _) in pairs.items()}
     total_given = sum(amounts.values())
     if total_given != net_price:
         raise ValueError(
             f"Fixed amounts sum to {total_given:,} AMD, but item net price is {net_price:,} AMD."
         )
-    return amounts
+    nonzero_vals = [v for v in amounts.values() if v > 0]
+    g = reduce(gcd, nonzero_vals) if nonzero_vals else 1
+    weights = {p: amounts.get(p, 0) // g for p in participants}
+    return amounts, weights
 
 
 # ── Interactive assignment loop ───────────────────────────────────────────────
@@ -182,7 +195,7 @@ def assign_items(items: list, participants: list) -> list:
         while True:
             try:
                 raw = input("  Assign > ").strip()
-                result = parse_assignment(raw, participants, net)
+                result, weights = parse_assignment(raw, participants, net)
                 # Show computed split for confirmation
                 parts_str = "  →  " + "  |  ".join(
                     f"{n}: {a:,} AMD" for n, a in result.items() if a > 0
@@ -197,7 +210,7 @@ def assign_items(items: list, participants: list) -> list:
 
         # Determine method label for report
         method = _detect_method(raw.strip(), result)
-        assigned.append({**item, "assignments": result, "split_method": method})
+        assigned.append({**item, "assignments": result, "assignment_weights": weights, "split_method": method})
 
     return assigned
 
@@ -287,6 +300,110 @@ def print_summary(participants: list, totals: dict, order: dict) -> None:
     print(f"{SEP_DBL}")
 
 
+# ── Payment method ────────────────────────────────────────────────────────────
+
+def collect_payment_info(participants: list, totals: dict) -> dict:
+    """
+    Ask about payment method and return a currency info dict.
+    For revolut payments, asks for EUR/AMD rate, total EUR paid, and weekend flag,
+    then computes each person's EUR share proportionally to their AMD total.
+    """
+    print(f"\n{SEP}")
+    while True:
+        try:
+            method = input("  Payment method? ([C]ash / [R]evolut): ").strip().lower()
+        except (KeyboardInterrupt, EOFError):
+            print("\nAborted.")
+            sys.exit(0)
+        if method in ("c", "cash"):
+            return {"method": "cash"}
+        if method in ("r", "revolut"):
+            break
+        print("  [!] Enter 'c' for cash or 'r' for revolut.")
+
+    while True:
+        try:
+            rate = float(input("  EUR → AMD rate? (e.g. 411.50): ").strip())
+            if rate > 0:
+                break
+        except (ValueError, EOFError):
+            pass
+        except KeyboardInterrupt:
+            print("\nAborted.")
+            sys.exit(0)
+        print("  [!] Enter a positive number.")
+
+    while True:
+        try:
+            eur_paid = float(input("  Total EUR paid (as shown in Revolut): ").strip())
+            if eur_paid > 0:
+                break
+        except (ValueError, EOFError):
+            pass
+        except KeyboardInterrupt:
+            print("\nAborted.")
+            sys.exit(0)
+        print("  [!] Enter a positive number.")
+
+    while True:
+        try:
+            wk = input("  Weekend purchase? ([Y]es / [N]o): ").strip().lower()
+        except (KeyboardInterrupt, EOFError):
+            print("\nAborted.")
+            sys.exit(0)
+        if wk in ("y", "yes"):
+            is_weekend = True
+            break
+        if wk in ("n", "no"):
+            is_weekend = False
+            break
+        print("  [!] Enter 'y' or 'n'.")
+
+    # Weekend: Revolut adds 1% exchange markup on top of what was shown.
+    # The user enters the base EUR amount; we add the fee to get the true deduction.
+    eur_effective = round(eur_paid * 1.01, 4) if is_weekend else eur_paid
+    eur_fee       = round(eur_effective - eur_paid, 4) if is_weekend else 0.0
+
+    # Distribute EUR proportionally to each person's AMD total.
+    # Use largest-remainder in euro-cents so sum == eur_effective exactly.
+    total_amd = sum(t["total"] for t in totals.values())
+    if total_amd > 0:
+        eur_cents_total = round(eur_effective * 100)
+        raw_cents = {p: totals[p]["total"] / total_amd * eur_cents_total for p in participants}
+        floored   = {p: int(v) for p, v in raw_cents.items()}
+        remainder = eur_cents_total - sum(floored.values())
+        for p in sorted(participants, key=lambda p: -(raw_cents[p] % 1)):
+            if remainder <= 0:
+                break
+            floored[p] += 1
+            remainder  -= 1
+        eur_per_person = {p: round(floored[p] / 100, 2) for p in participants}
+    else:
+        eur_per_person = {p: 0.0 for p in participants}
+
+    # Print EUR summary
+    print(f"\n{SEP}")
+    print(f"  REVOLUT PAYMENT SUMMARY")
+    print(f"  Rate         : {rate:,.2f} AMD/EUR")
+    if is_weekend:
+        print(f"  Paid         : €{eur_paid:.2f}  +  1% weekend fee (€{eur_fee:.2f})  =  €{eur_effective:.2f} total")
+    else:
+        print(f"  Paid         : €{eur_paid:.2f}  (weekday — no fee)")
+    print(f"  Per person:")
+    for p in participants:
+        print(f"    {p}: €{eur_per_person[p]:.2f}")
+
+    return {
+        "method":         "revolut",
+        "rate":           rate,
+        "eur_paid":       eur_paid,
+        "is_weekend":     is_weekend,
+        "eur_fee":        eur_fee,
+        "eur_effective":  eur_effective,
+        "eur_per_person": eur_per_person,
+    }
+
+
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 def main() -> None:
@@ -353,6 +470,9 @@ def main() -> None:
 
     print_summary(participants, totals, order)
 
+    # ── Payment method ───────────────────────────────────────────────────────
+    currency = collect_payment_info(participants, totals)
+
     # ── Save ────────────────────────────────────────────────────────────────
     split_data = {
         "order_id":     order_id,
@@ -366,6 +486,7 @@ def main() -> None:
         },
         "fee_allocations": fee_allocs,
         "totals":       totals,
+        "currency":     currency,
         "order_total":  order["total_to_pay"],
         "order_meta":   {
             "create_date":   order.get("create_date"),

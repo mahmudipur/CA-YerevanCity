@@ -207,6 +207,8 @@ def _write_order_tab(sh, split: dict) -> None:
     fee_allocs  = split["fee_allocations"]
     totals      = split["totals"]
     meta        = split.get("order_meta", {})
+    currency    = split.get("currency", {"method": "cash"})
+    is_revolut  = currency.get("method") == "revolut"
     n_p         = len(participants)
 
     tab_title = f"Order {order_id}"
@@ -236,9 +238,30 @@ def _write_order_tab(sh, split: dict) -> None:
     total_fees = fees["delivery"] + fees["service"] + fees["driver_tip"]
     items_subtotal = sum(it["net_price"] for it in items if not it["is_canceled"])
 
+    if is_revolut:
+        eur_paid      = currency.get("eur_paid", 0)
+        eur_effective = currency.get("eur_effective", eur_paid)
+        eur_fee       = currency.get("eur_fee", 0)
+        rate          = currency.get("rate", 0)
+        weekend_label = "Yes (1% fee applied)" if currency.get("is_weekend") else "No"
+        revolut_row   = [
+            "Payment:", "Revolut", "",
+            "EUR paid:", eur_paid, "",
+            f"Weekend:", weekend_label, "",
+            "EUR effective:", eur_effective, "",
+            "Fee (EUR):", eur_fee, "",
+            "Rate (AMD/EUR):", rate,
+        ]
+    else:
+        revolut_row = None
+
     header_rows = [
         [f"Order {order_id}", "", "Date:", date_str, "", "Status:", meta.get("status_label", ""), "", f"Delivery: {delivery_str}"],
         ["Branch:", meta.get("branch_address", "N/A"), "", "", "Payment:", meta.get("payment_label", ""), "", "", ""],
+    ]
+    if revolut_row:
+        header_rows.append(revolut_row)
+    header_rows += [
         [""],
         ["Items Subtotal:", items_subtotal, "", "Delivery Fee:", fees["delivery"], "Service Fee:", fees["service"],
          "Tip:", fees["driver_tip"], "TOTAL:", split["order_total"]],
@@ -247,7 +270,7 @@ def _write_order_tab(sh, split: dict) -> None:
     ws.update("A1", header_rows)
 
     # ── Block B: Item table ──────────────────────────────────────────────────
-    COL_HEADER_ROW = 5   # 0-indexed row 5 = spreadsheet row 6
+    COL_HEADER_ROW = len(header_rows)  # 0-indexed; shifts by 1 when revolut row present
     item_headers = ["#", "Item", "Qty", "Unit", "Unit Price", "Total", "Discount", "Net"] \
                    + participants + ["Method"]
     data_rows = [item_headers]
@@ -292,15 +315,23 @@ def _write_order_tab(sh, split: dict) -> None:
     # ── Block D: Final totals ────────────────────────────────────────────────
     total_section_row = fee_section_row + 2 + len(participants) + 2
 
-    total_header = ["TOTAL OWED"] + [""] * (n_p - 1 + 8)
-    total_col_hdr = ["", "Items", "Fees", "TOTAL"]
+    total_header  = ["TOTAL OWED"] + [""] * (n_p - 1 + 8)
+    if is_revolut:
+        total_col_hdr = ["", "Items (AMD)", "Fees (AMD)", "TOTAL (AMD)", "TOTAL (EUR)"]
+        eur_pp = currency.get("eur_per_person", {})
+    else:
+        total_col_hdr = ["", "Items", "Fees", "TOTAL"]
+        eur_pp = {}
     ws.update(f"A{total_section_row + 1}", [total_header])
     ws.update(f"A{total_section_row + 2}", [total_col_hdr])
 
     total_rows = []
     for p in participants:
         t = totals.get(p, {})
-        total_rows.append([p, t.get("items", 0), t.get("fees", 0), t.get("total", 0)])
+        row = [p, t.get("items", 0), t.get("fees", 0), t.get("total", 0)]
+        if is_revolut:
+            row.append(eur_pp.get(p, 0))
+        total_rows.append(row)
     ws.update(f"A{total_section_row + 3}", total_rows)
 
     # ── Formatting ───────────────────────────────────────────────────────────
@@ -350,21 +381,32 @@ def _write_order_tab(sh, split: dict) -> None:
                                     fee_section_row + 2 + len(participants), 1, 5))
 
     # Totals section
+    total_data_cols = 5 if is_revolut else 4  # includes EUR column for revolut
     requests.append(_bg_req(ws_id, total_section_row, total_section_row + 1, 0, TOTAL_COLS, C_FEE_HEADER))
     requests.append(_text_req(ws_id, total_section_row, total_section_row + 1, 0, TOTAL_COLS,
                                bold=True, color=C_WHITE, size=11))
-    requests.append(_bg_req(ws_id, total_section_row + 1, total_section_row + 2, 0, 4, _rgb(48, 63, 159)))
-    requests.append(_text_req(ws_id, total_section_row + 1, total_section_row + 2, 0, 4,
+    requests.append(_bg_req(ws_id, total_section_row + 1, total_section_row + 2, 0, total_data_cols, _rgb(48, 63, 159)))
+    requests.append(_text_req(ws_id, total_section_row + 1, total_section_row + 2, 0, total_data_cols,
                                bold=True, color=C_WHITE))
 
-    # Highlight each person's TOTAL OWED cell with green bg
+    # Highlight each person's TOTAL OWED (AMD) cell with green bg
     for idx in range(len(participants)):
         r = total_section_row + 2 + idx
         requests.append(_bg_req(ws_id, r, r + 1, 3, 4, C_TOTAL_BG))
         requests.append(_text_req(ws_id, r, r + 1, 3, 4, bold=True, color=C_TOTAL_BOLD))
+        if is_revolut:
+            # EUR column highlighted in a warm amber
+            requests.append(_bg_req(ws_id, r, r + 1, 4, 5, _rgb(255, 248, 225)))
+            requests.append(_text_req(ws_id, r, r + 1, 4, 5, bold=True, color=_rgb(230, 81, 0)))
 
+    # AMD number format for items/fees/total columns
     requests.append(_number_fmt_req(ws_id, total_section_row + 2,
                                     total_section_row + 2 + len(participants), 1, 4))
+    # EUR number format (2 decimal places) for EUR column
+    if is_revolut:
+        requests.append(_number_fmt_req(ws_id, total_section_row + 2,
+                                        total_section_row + 2 + len(participants), 4, 5,
+                                        pattern="#,##0.00"))
 
     # Column widths
     col_widths = {0: 40, 1: 250, 2: 50, 3: 50, 4: 100, 5: 90, 6: 90, 7: 90}

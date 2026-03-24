@@ -82,7 +82,15 @@ Example:
      Assign >
    ```
 3. After all items: allocates fees (delivery, service, tip) proportionally by each person's item total
-4. Prints a full summary and saves `.tmp/split_{order_id}.json`
+4. Prints a full summary
+5. Asks about **payment method**:
+   - **Cash** → no further steps, saves and exits
+   - **Revolut** → asks for:
+     - EUR → AMD conversion rate (e.g. `411.50`)
+     - Total EUR paid (as shown in Revolut)
+     - Whether the purchase was made on a **weekend** (Sat/Sun) — if yes, a 1% Revolut exchange markup is added on top of the paid EUR amount
+   - Prints per-person EUR shares and saves to split file
+6. Saves `.tmp/split_{order_id}.json`
 
 **Assignment input formats:**
 
@@ -100,26 +108,33 @@ Example:
 
 ---
 
-### Step 3 — Generate Google Sheets report
+### Step 3 — Generate Tricount CSV report
 
 ```bash
-.venv/bin/python tools/generate_report.py <order_id>
+.venv/bin/python tools/generate_csv.py <order_id>
 ```
 
 **What it does:**
 - Reads `.tmp/split_{order_id}.json`
-- Opens the spreadsheet (or creates it on first run)
-- Creates/overwrites tab `Order {order_id}` with:
-  - **Block A** — Order header (ID, date, status, branch, payment, fees)
-  - **Block B** — Item breakdown table with per-person columns
-  - **Block C** — Fee allocation per person (delivery / service / tip)
-  - **Block D** — Final TOTAL OWED per person (items + fees)
-- Updates `_Summary` tab with one row for this order
-- Prints the spreadsheet URL
+- Writes `.tmp/report_{order_id}.csv` in the Tricount tracking format:
 
-**If GOOGLE_SHEET_ID is empty:** A new spreadsheet named "Yerevan City Orders" is created in your Google Drive and the ID is saved to `.env` automatically.
+| Column group | Columns |
+|---|---|
+| Fixed | product, price, services (0 for YC) |
+| Weights | One integer per participant — equal share = 1, sole owner = N (number of participants), excluded = 0 |
+| AMD amounts | Each participant's actual share in AMD |
 
-**If the tab already exists:** It is cleared and rewritten (idempotent — safe to re-run).
+Footer rows:
+- Per-person AMD totals
+- Grand total (centre of AMD block)
+- **If Revolut:** EUR paid, rate, AMD verification total, weekend fee (0 or 1% of EUR paid), EUR per person
+
+**Open the file:**
+```bash
+open .tmp/report_<order_id>.csv
+```
+
+**If the file already exists:** It is overwritten (idempotent — safe to re-run).
 
 ---
 
@@ -133,7 +148,8 @@ cd /Users/mmpdev/develop/CA-YerevanCity
 
 .venv/bin/python tools/fetch_order.py
 .venv/bin/python tools/split_basket.py <order_id_from_above>
-.venv/bin/python tools/generate_report.py <order_id_from_above>
+.venv/bin/python tools/generate_csv.py <order_id_from_above>
+open .tmp/report_<order_id_from_above>.csv
 ```
 
 ---
