@@ -29,7 +29,8 @@ def _prompt(text: str) -> str:
 
 
 def run_yc(refresh: bool = False) -> None:
-    order_id = fetch_order.main(refresh=refresh)
+    target = _prompt("  Order ID (Enter for latest): ")
+    order_id = fetch_order.main(refresh=refresh, target_order_id=target)
     sys.argv  = [sys.argv[0], order_id]
     split_basket.main()
     generate_csv.main()

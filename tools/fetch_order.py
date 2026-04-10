@@ -119,24 +119,46 @@ def _print_summary(order: dict) -> None:
     print(f"Total     : {order['total_to_pay']:,} AMD{fee_str}")
 
 
-def main(refresh: bool = False) -> str:
+def main(refresh: bool = False, target_order_id: str = "") -> str:
     load_dotenv(ENV_PATH)
     token = _load_token()
 
     TMP_DIR.mkdir(exist_ok=True)
 
-    print("Fetching order list ...")
-    try:
-        orders = get_orders(token, page=1, count=1)
-    except YCError as e:
-        print(f"Error: {e}")
-        sys.exit(1)
+    if target_order_id:
+        print(f"Searching for order {target_order_id} ...")
+        latest = None
+        for page in range(1, 20):
+            try:
+                batch = get_orders(token, page=page, count=20)
+            except YCError as e:
+                print(f"Error: {e}")
+                sys.exit(1)
+            if not batch:
+                break
+            for o in batch:
+                if o.get("offlineOrderId") == target_order_id:
+                    latest = o
+                    break
+            if latest:
+                break
+        if not latest:
+            print(f"Order {target_order_id} not found.")
+            sys.exit(1)
+    else:
+        print("Fetching order list ...")
+        try:
+            orders = get_orders(token, page=1, count=1)
+        except YCError as e:
+            print(f"Error: {e}")
+            sys.exit(1)
 
-    if not orders:
-        print("No orders found on your account.")
-        sys.exit(1)
+        if not orders:
+            print("No orders found on your account.")
+            sys.exit(1)
 
-    latest     = orders[0]
+        latest = orders[0]
+
     order_id   = latest.get("offlineOrderId", "")
     created_on = _parse_date(latest.get("createDate")) or ""
 
