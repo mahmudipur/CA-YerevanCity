@@ -359,10 +359,25 @@ def collect_payment_info(participants: list, totals: dict) -> dict:
             break
         print("  [!] Enter 'y' or 'n'.")
 
-    # Weekend: Revolut adds 1% exchange markup on top of what was shown.
-    # The user enters the base EUR amount; we add the fee to get the true deduction.
-    eur_effective = round(eur_paid * 1.01, 4) if is_weekend else eur_paid
-    eur_fee       = round(eur_effective - eur_paid, 4) if is_weekend else 0.0
+    while True:
+        try:
+            fu = input("  Exchange fair usage fee? ([Y]es / [N]o): ").strip().lower()
+        except (KeyboardInterrupt, EOFError):
+            print("\nAborted.")
+            sys.exit(0)
+        if fu in ("y", "yes"):
+            is_fair_usage = True
+            break
+        if fu in ("n", "no"):
+            is_fair_usage = False
+            break
+        print("  [!] Enter 'y' or 'n'.")
+
+    # Weekend adds 1% on top of base; fair usage adds another 1% on top of base.
+    # Both fees are calculated from eur_paid independently and then summed.
+    eur_fee       = round(eur_paid * 0.01, 4) if is_weekend else 0.0
+    eur_fair_usage_fee = round(eur_paid * 0.01, 4) if is_fair_usage else 0.0
+    eur_effective = round(eur_paid + eur_fee + eur_fair_usage_fee, 4)
 
     # Distribute EUR proportionally to each person's AMD total.
     # Use largest-remainder in euro-cents so sum == eur_effective exactly.
@@ -385,22 +400,29 @@ def collect_payment_info(participants: list, totals: dict) -> dict:
     print(f"\n{SEP}")
     print(f"  REVOLUT PAYMENT SUMMARY")
     print(f"  Rate         : {rate:,.2f} AMD/EUR")
+    fees_desc = []
     if is_weekend:
-        print(f"  Paid         : €{eur_paid:.2f}  +  1% weekend fee (€{eur_fee:.2f})  =  €{eur_effective:.2f} total")
+        fees_desc.append(f"1% weekend (€{eur_fee:.2f})")
+    if is_fair_usage:
+        fees_desc.append(f"1% fair usage (€{eur_fair_usage_fee:.2f})")
+    if fees_desc:
+        print(f"  Paid         : €{eur_paid:.2f}  +  {' + '.join(fees_desc)}  =  €{eur_effective:.2f} total")
     else:
-        print(f"  Paid         : €{eur_paid:.2f}  (weekday — no fee)")
+        print(f"  Paid         : €{eur_paid:.2f}  (no exchange fees)")
     print(f"  Per person:")
     for p in participants:
         print(f"    {p}: €{eur_per_person[p]:.2f}")
 
     return {
-        "method":         "revolut",
-        "rate":           rate,
-        "eur_paid":       eur_paid,
-        "is_weekend":     is_weekend,
-        "eur_fee":        eur_fee,
-        "eur_effective":  eur_effective,
-        "eur_per_person": eur_per_person,
+        "method":              "revolut",
+        "rate":                rate,
+        "eur_paid":            eur_paid,
+        "is_weekend":          is_weekend,
+        "eur_fee":             eur_fee,
+        "is_fair_usage":       is_fair_usage,
+        "eur_fair_usage_fee":  eur_fair_usage_fee,
+        "eur_effective":       eur_effective,
+        "eur_per_person":      eur_per_person,
     }
 
 

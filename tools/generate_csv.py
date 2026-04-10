@@ -144,12 +144,14 @@ def main() -> None:
 
         # Revolut section
         if is_revolut:
-            eur_paid      = currency.get("eur_paid", 0)
-            eur_effective = currency.get("eur_effective", eur_paid)
-            eur_fee       = currency.get("eur_fee", 0)
-            rate          = currency.get("rate", 0)
-            is_weekend    = currency.get("is_weekend", False)
-            eur_pp        = currency.get("eur_per_person", {})
+            eur_paid           = currency.get("eur_paid", 0)
+            eur_effective      = currency.get("eur_effective", eur_paid)
+            eur_fee            = currency.get("eur_fee", 0)
+            eur_fair_usage_fee = currency.get("eur_fair_usage_fee", 0)
+            rate               = currency.get("rate", 0)
+            is_weekend         = currency.get("is_weekend", False)
+            is_fair_usage      = currency.get("is_fair_usage", False)
+            eur_pp             = currency.get("eur_per_person", {})
 
             # EUR paid, rate, AMD total — each in the note column
             for val in [eur_paid, rate, order_total]:
@@ -157,13 +159,17 @@ def main() -> None:
 
             w.writerow([""] * (TOTAL_DATA + 1))
 
-            # Weekend fee label in the first AMD amount column
+            # Weekend fee label + amount
             label_row = [""] * (TOTAL_DATA + 1)
             label_row[AMT_START] = "weekend fee"
             w.writerow(label_row)
-
-            # Weekend fee amount (0 if weekday) in the centre AMD column
             w.writerow(_row({CENTER_AMT: eur_fee}))
+
+            # Fair usage fee label + amount
+            label_row = [""] * (TOTAL_DATA + 1)
+            label_row[AMT_START] = "fair usage fee"
+            w.writerow(label_row)
+            w.writerow(_row({CENTER_AMT: eur_fair_usage_fee}))
 
             # EUR per person in the AMD amount columns
             eur_amounts = [eur_pp.get(p, 0) for p in participants]
