@@ -30,6 +30,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 from dotenv import load_dotenv
 from split_math import _largest_remainder, _equal_split, _pct_split
+import interactive
 
 ROOT     = Path(__file__).parent.parent
 ENV_PATH = ROOT / ".env"
@@ -132,69 +133,6 @@ def parse_assignment(text: str, participants: list, net_price: int) -> tuple:
 
 
 # ── Interactive assignment loop ───────────────────────────────────────────────
-
-def assign_items(items: list, participants: list) -> list:
-    """Walk through each active item and collect assignments. Returns enriched item list."""
-    active = [(i, it) for i, it in enumerate(items) if not it["is_canceled"]]
-    total_active = len(active)
-    assigned = []
-
-    for seq, (orig_idx, item) in enumerate(active, start=1):
-        net = item["net_price"]
-        qty = item["quantity"]
-        unit = item.get("unit") or "pcs"
-        qty_str = f"x{qty:.0f}" if qty == int(qty) else f"x{qty}"
-
-        print(f"\n{SEP}")
-        print(f"  Item {seq}/{total_active}")
-        print(f"  {item['name']}")
-        qty_line = f"  {qty_str} {unit}"
-        if item["unit_price"]:
-            qty_line += f"  ·  {item['unit_price']:,} AMD/unit"
-        if item["discount"]:
-            qty_line += f"  ·  Discount: -{item['discount']:,}"
-        print(qty_line)
-        print(f"  Net: {net:,} AMD")
-        print(f"{SEP}")
-        print(f"  Participants: {', '.join(participants)}")
-        print(f"  Formats: Enter=all equal | me,mahdi | me:60%,mahdi:40% | me:1200,mahdi:600")
-
-        while True:
-            try:
-                raw = input("  Assign > ").strip()
-                result, weights = parse_assignment(raw, participants, net)
-                # Show computed split for confirmation
-                parts_str = "  →  " + "  |  ".join(
-                    f"{n}: {a:,} AMD" for n, a in result.items() if a > 0
-                )
-                print(parts_str)
-                break
-            except ValueError as e:
-                print(f"  [!] {e}")
-            except (KeyboardInterrupt, EOFError):
-                print("\nAborted.")
-                sys.exit(0)
-
-        # Determine method label for report
-        method = _detect_method(raw.strip(), result)
-        assigned.append({**item, "assignments": result, "assignment_weights": weights, "split_method": method})
-
-    return assigned
-
-
-def _detect_method(raw: str, result: dict) -> str:
-    if not raw or raw.lower() in ("all", "a", ""):
-        return "equal/all"
-    if "%" in raw:
-        return "percentage"
-    if ":" in raw:
-        return "fixed"
-    if len(result) < 3 and "," in raw:
-        return "equal/partial"
-    if len(result) == 1:
-        return "single"
-    return "equal/partial"
-
 
 # ── Fee allocation ────────────────────────────────────────────────────────────
 
@@ -414,22 +352,15 @@ def main() -> None:
     order = json.loads(order_path.read_text())
 
     # ── Participants ────────────────────────────────────────────────────────
-    defaults = [p.strip() for p in os.getenv("DEFAULT_PARTICIPANTS", "Me,Mahdi,Amir").split(",") if p.strip()]
+    defaults = [p.strip() for p in os.getenv("DEFAULT_PARTICIPANTS", "Me").split(",") if p.strip()]
     print(f"\n{SEP_DBL}")
     print(f"  SPLIT BASKET — {order_id}")
     print(f"{SEP_DBL}")
-    print(f"  Default participants: {', '.join(defaults)}")
     try:
-        temp_raw = input("  Temporary participants? (names comma-separated, or Enter to skip): ").strip()
-    except (KeyboardInterrupt, EOFError):
+        participants = interactive.setup_roster(defaults)
+    except KeyboardInterrupt:
         print("\nAborted.")
         sys.exit(0)
-
-    temp_participants = [p.strip() for p in temp_raw.split(",") if p.strip()] if temp_raw else []
-    participants = defaults + temp_participants
-
-    if temp_participants:
-        print(f"  Active participants: {', '.join(participants)}")
 
     # ── Order overview ──────────────────────────────────────────────────────
     active_items = [it for it in order["items"] if not it["is_canceled"]]
@@ -444,10 +375,19 @@ def main() -> None:
     print(f"  Total     : {order['total_to_pay']:,} AMD")
 
     print(f"\n  Walking through {len(active_items)} items. Canceled items are skipped.")
-    input("  Press Enter to begin ...")
 
     # ── Item-by-item assignment ─────────────────────────────────────────────
-    assigned_items = assign_items(order["items"], participants)
+    try:
+        records = []
+        for seq, item in enumerate(active_items, start=1):
+            print(f"\n{SEP}\n  Item {seq}/{len(active_items)}")
+            amounts, weights, method = interactive.assign_item(item, participants)
+            records.append({**item, "assignments": amounts,
+                            "assignment_weights": weights, "split_method": method})
+        assigned_items = interactive.review_and_edit(records, participants)
+    except KeyboardInterrupt:
+        print("\nAborted.")
+        sys.exit(0)
 
     # ── Fee allocation ──────────────────────────────────────────────────────
     item_totals = {
