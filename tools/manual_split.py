@@ -19,12 +19,12 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 from dotenv import load_dotenv
+import interactive
 from split_basket import (
     SEP, SEP_DBL,
-    parse_assignment, resolve_name,
     collect_payment_info,
     compute_totals, allocate_fees,
-    print_summary, _detect_method,
+    print_summary,
 )
 
 ROOT     = Path(__file__).parent.parent
@@ -64,6 +64,7 @@ def _prompt(text: str) -> str:
 # ── Item entry loop ───────────────────────────────────────────────────────────
 
 def collect_items(participants: list) -> list:
+    """Collect manual item data, then assign each via the interactive UI."""
     items = []
     seq   = 0
 
@@ -90,39 +91,33 @@ def collect_items(participants: list) -> list:
         net     = price + service
 
         print(f"  Net: {net:,} AMD" + (f"  (price {price:,} + service {service:,})" if service else ""))
-        print(f"{SEP}")
-        print(f"  Participants: {', '.join(participants)}")
-        print(f"  Formats: Enter=all equal | me,mahdi | me:60%,mahdi:40% | me:1200,mahdi:600")
-
-        while True:
-            try:
-                raw     = _prompt("  Assign > ")
-                result, weights = parse_assignment(raw, participants, net)
-                parts_str = "  →  " + "  |  ".join(
-                    f"{n}: {a:,} AMD" for n, a in result.items() if a > 0
-                )
-                print(parts_str)
-                break
-            except ValueError as e:
-                print(f"  [!] {e}")
-
-        method = _detect_method(raw, result)
         items.append({
-            "name":               name,
-            "price":              price,
-            "service":            service,
-            "net_price":          net,
-            "assignments":        result,
-            "assignment_weights": weights,
-            "split_method":       method,
-            "is_canceled":        False,
+            "name":        name,
+            "price":       price,
+            "service":     service,
+            "net_price":   net,
+            "is_canceled": False,
         })
 
         another = _prompt("\n  Add another item? ([Y]es / [N]o): ").lower()
         if another not in ("y", "yes", ""):
             break
 
-    return items
+    if not items:
+        print("  No items entered.")
+        sys.exit(0)
+
+    try:
+        records = []
+        for i, item in enumerate(items, start=1):
+            print(f"\n{SEP}\n  Item {i}/{len(items)}")
+            amounts, weights, method = interactive.assign_item(item, participants)
+            records.append({**item, "assignments": amounts,
+                            "assignment_weights": weights, "split_method": method})
+        return interactive.review_and_edit(records, participants)
+    except KeyboardInterrupt:
+        print("\nAborted.")
+        sys.exit(0)
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
@@ -132,19 +127,16 @@ def main() -> None:
     TMP_DIR.mkdir(exist_ok=True)
 
     # ── Participants ─────────────────────────────────────────────────────────
-    defaults = [p.strip() for p in os.getenv("DEFAULT_PARTICIPANTS", "Me,Mahdi,Amir").split(",") if p.strip()]
+    defaults = [p.strip() for p in os.getenv("DEFAULT_PARTICIPANTS", "Me").split(",") if p.strip()]
 
     print(f"\n{SEP_DBL}")
     print(f"  MANUAL SPLIT")
     print(f"{SEP_DBL}")
-    print(f"  Default participants: {', '.join(defaults)}")
-
-    temp_raw     = _prompt("  Temporary participants? (comma-separated, or Enter to skip): ")
-    temp_list    = [p.strip() for p in temp_raw.split(",") if p.strip()] if temp_raw else []
-    participants = defaults + temp_list
-
-    if temp_list:
-        print(f"  Active participants: {', '.join(participants)}")
+    try:
+        participants = interactive.setup_roster(defaults)
+    except KeyboardInterrupt:
+        print("\nAborted.")
+        sys.exit(0)
 
     # ── Session name ─────────────────────────────────────────────────────────
     session_name = _prompt("\n  Session name (e.g. Kavkaz restaurant): ") or "manual"
