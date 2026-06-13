@@ -186,6 +186,7 @@ open .tmp/report_<order_id_from_above>.csv
 - **API quirks (from TMA-YC):**
   - `osType` must be `2` (Postman collection had wrong value `3`)
   - `createdOn` in `GetOfflineOrderById` must be `YYYY-MM-DD` date only; full ISO datetime returns a 500 error
+  - `createdOn` must be the order's **local (Armenia, UTC+4)** date, NOT the raw UTC date from `createDate`. The endpoint joins line items by local calendar date, so an order placed 20:00–23:59 UTC (00:00–03:59 local) is stored under the *next* day and returns `orderItems: []` (with a still-correct `totalPrice`) if looked up by its UTC date. `fetch_order._parse_date` converts UTC→UTC+4 before slicing the date. Symptom if this regresses: "0 active items" but correct total. (Armenia is a fixed UTC+4, no DST.)
   - `offlineOrderId` ("KM...") is the key for `GetOfflineOrderById`, not `id`
   - Prices from the API are floats — all stored and computed as integer AMD (whole drams)
   - For offline/pickup orders, `price` in `orderItems` is the **line total** (not per-unit); `totalPrice` is always 0 for these orders. Per-unit price is back-calculated as `price / quantity`.

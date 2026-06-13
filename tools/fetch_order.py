@@ -12,7 +12,7 @@ Usage:
 import json
 import os
 import sys
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
@@ -23,6 +23,13 @@ from yc_client import YCError, get_order_detail, get_orders
 ROOT    = Path(__file__).parent.parent
 ENV_PATH = ROOT / ".env"
 TMP_DIR  = ROOT / ".tmp"
+
+# API timestamps (createDate/finishDate) are UTC with no offset. Yerevan City's
+# GetOfflineOrderById joins line items by the LOCAL calendar date, so an order
+# placed 20:00-23:59 UTC (00:00-03:59 local) is stored under the *next* day and
+# returns zero items if looked up by its raw UTC date. Armenia is a fixed UTC+4
+# (no DST), so convert before taking the date portion.
+ARMENIA_TZ = timezone(timedelta(hours=4))
 
 STATUS_MAP = {
     0: "Pending",
@@ -53,7 +60,11 @@ def _parse_date(iso_str: str | None) -> str | None:
     if not iso_str:
         return None
     try:
-        return datetime.fromisoformat(iso_str.replace("Z", "+00:00")).strftime("%Y-%m-%d")
+        dt = datetime.fromisoformat(iso_str.replace("Z", "+00:00"))
+        # Naive timestamps from the API are UTC; aware ones get normalized to UTC.
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(ARMENIA_TZ).strftime("%Y-%m-%d")
     except ValueError:
         return iso_str[:10]
 
