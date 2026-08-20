@@ -180,11 +180,15 @@ def main(refresh: bool = False, target_order_id: str = "") -> str:
     out_path = TMP_DIR / f"order_{order_id}.json"
 
     if out_path.exists() and not refresh:
-        print(f"Using cached order: {out_path}")
         order = json.loads(out_path.read_text())
-        _print_summary(order)
-        print(f"\nNext: python tools/split_basket.py {order_id}")
-        return order_id
+        # An empty cache is almost always stale (e.g. written before the
+        # UTC→local date fix). Re-fetch instead of serving a useless result.
+        if order.get("items"):
+            print(f"Using cached order: {out_path}")
+            _print_summary(order)
+            print(f"\nNext: python tools/split_basket.py {order_id}")
+            return order_id
+        print(f"Cached order has no items — re-fetching {order_id} ...")
 
     print(f"Fetching detail for {order_id} ({created_on}) ...")
     try:
