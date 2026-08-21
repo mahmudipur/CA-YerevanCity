@@ -207,6 +207,50 @@ def print_summary(participants: list, totals: dict, order: dict) -> None:
 
 # ── Payment method ────────────────────────────────────────────────────────────
 
+def compute_revolut_currency(rate: float, eur_paid: float, is_weekend: bool,
+                              is_fair_usage: bool, totals: dict, participants: list) -> dict:
+    """
+    Pure calculation extracted from collect_payment_info(): given the Revolut
+    inputs, compute fees and the per-person EUR distribution. No I/O.
+
+    Weekend adds 1% on top of base; fair usage adds another 1% on top of base.
+    Both fees are calculated from eur_paid independently and then summed.
+    Returns the same currency dict shape written to split_*.json.
+    """
+    eur_fee            = round(eur_paid * 0.01, 4) if is_weekend else 0.0
+    eur_fair_usage_fee = round(eur_paid * 0.01, 4) if is_fair_usage else 0.0
+    eur_effective      = round(eur_paid + eur_fee + eur_fair_usage_fee, 4)
+
+    # Distribute EUR proportionally to each person's AMD total.
+    # Use largest-remainder in euro-cents so sum == eur_effective exactly.
+    total_amd = sum(t["total"] for t in totals.values())
+    if total_amd > 0:
+        eur_cents_total = round(eur_effective * 100)
+        raw_cents = {p: totals[p]["total"] / total_amd * eur_cents_total for p in participants}
+        floored   = {p: int(v) for p, v in raw_cents.items()}
+        remainder = eur_cents_total - sum(floored.values())
+        for p in sorted(participants, key=lambda p: -(raw_cents[p] % 1)):
+            if remainder <= 0:
+                break
+            floored[p] += 1
+            remainder  -= 1
+        eur_per_person = {p: round(floored[p] / 100, 2) for p in participants}
+    else:
+        eur_per_person = {p: 0.0 for p in participants}
+
+    return {
+        "method":              "revolut",
+        "rate":                rate,
+        "eur_paid":            eur_paid,
+        "is_weekend":          is_weekend,
+        "eur_fee":             eur_fee,
+        "is_fair_usage":       is_fair_usage,
+        "eur_fair_usage_fee":  eur_fair_usage_fee,
+        "eur_effective":       eur_effective,
+        "eur_per_person":      eur_per_person,
+    }
+
+
 def collect_payment_info(participants: list, totals: dict) -> dict:
     """
     Ask about payment method and return a currency info dict.
@@ -278,28 +322,12 @@ def collect_payment_info(participants: list, totals: dict) -> dict:
             break
         print("  [!] Enter 'y' or 'n'.")
 
-    # Weekend adds 1% on top of base; fair usage adds another 1% on top of base.
-    # Both fees are calculated from eur_paid independently and then summed.
-    eur_fee       = round(eur_paid * 0.01, 4) if is_weekend else 0.0
-    eur_fair_usage_fee = round(eur_paid * 0.01, 4) if is_fair_usage else 0.0
-    eur_effective = round(eur_paid + eur_fee + eur_fair_usage_fee, 4)
-
-    # Distribute EUR proportionally to each person's AMD total.
-    # Use largest-remainder in euro-cents so sum == eur_effective exactly.
-    total_amd = sum(t["total"] for t in totals.values())
-    if total_amd > 0:
-        eur_cents_total = round(eur_effective * 100)
-        raw_cents = {p: totals[p]["total"] / total_amd * eur_cents_total for p in participants}
-        floored   = {p: int(v) for p, v in raw_cents.items()}
-        remainder = eur_cents_total - sum(floored.values())
-        for p in sorted(participants, key=lambda p: -(raw_cents[p] % 1)):
-            if remainder <= 0:
-                break
-            floored[p] += 1
-            remainder  -= 1
-        eur_per_person = {p: round(floored[p] / 100, 2) for p in participants}
-    else:
-        eur_per_person = {p: 0.0 for p in participants}
+    currency = compute_revolut_currency(rate, eur_paid, is_weekend, is_fair_usage,
+                                         totals, participants)
+    eur_fee            = currency["eur_fee"]
+    eur_fair_usage_fee = currency["eur_fair_usage_fee"]
+    eur_effective      = currency["eur_effective"]
+    eur_per_person     = currency["eur_per_person"]
 
     # Print EUR summary
     print(f"\n{SEP}")
@@ -318,17 +346,7 @@ def collect_payment_info(participants: list, totals: dict) -> dict:
     for p in participants:
         print(f"    {p}: €{eur_per_person[p]:.2f}")
 
-    return {
-        "method":              "revolut",
-        "rate":                rate,
-        "eur_paid":            eur_paid,
-        "is_weekend":          is_weekend,
-        "eur_fee":             eur_fee,
-        "is_fair_usage":       is_fair_usage,
-        "eur_fair_usage_fee":  eur_fair_usage_fee,
-        "eur_effective":       eur_effective,
-        "eur_per_person":      eur_per_person,
-    }
+    return currency
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────

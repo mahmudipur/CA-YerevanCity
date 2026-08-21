@@ -5,3 +5,9 @@ token.json
 __pycache__/
 *.pyc
 .DS_Store
+
+# Web app
+web/frontend/node_modules/
+web/frontend/dist/
+web/backend/.pytest_cache/
+.venv-web/
