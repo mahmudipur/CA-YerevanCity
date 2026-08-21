@@ -93,6 +93,7 @@ def _build_order(list_item: dict, detail: dict) -> dict:
             "discount":    discount,
             "net_price":   total_price - discount,
             "is_canceled": bool(raw.get("isCanceled", False)),
+            "image":       raw.get("photo") or None,
         })
 
     return {
