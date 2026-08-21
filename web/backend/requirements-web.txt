@@ -1,0 +1,9 @@
+# Web app only — kept separate from the root requirements.txt so a
+# terminal-only install never needs these. Install with:
+#   pip install -r web/backend/requirements-web.txt
+fastapi==0.115.14
+uvicorn[standard]==0.32.1
+pydantic-settings==2.15.0
+
+# test-only (FastAPI TestClient)
+httpx==0.28.1

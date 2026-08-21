@@ -1,0 +1,22 @@
+{
+  "order_id": "FIXTURE",
+  "create_date": "2026-01-01T12:00:00",
+  "finish_date": "2026-01-01T12:30:00",
+  "status": 2,
+  "status_label": "Delivered",
+  "is_delivery": true,
+  "payment_method": 2,
+  "payment_label": "Card",
+  "branch_address": "Test Branch",
+  "total_price": 10000,
+  "total_to_pay": 10500,
+  "delivery_fee": 300,
+  "service_fee": 200,
+  "driver_tip": 0,
+  "items": [
+    {"id": "1", "name": "Pizza", "quantity": 1.0, "unit": null, "unit_price": 4000, "total_price": 4000, "discount": 0, "net_price": 4000, "is_canceled": false},
+    {"id": "2", "name": "Soda", "quantity": 2.0, "unit": null, "unit_price": 500, "total_price": 1000, "discount": 100, "net_price": 900, "is_canceled": false},
+    {"id": "3", "name": "Salad", "quantity": 1.0, "unit": null, "unit_price": 3000, "total_price": 3000, "discount": 0, "net_price": 3000, "is_canceled": false},
+    {"id": "4", "name": "Canceled Item", "quantity": 1.0, "unit": null, "unit_price": 2000, "total_price": 2000, "discount": 0, "net_price": 2000, "is_canceled": true}
+  ]
+}
