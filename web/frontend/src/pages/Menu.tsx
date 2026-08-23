@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
-import { ArrowRightOnRectangleIcon, ShoppingBagIcon, PencilSquareIcon, ClockIcon } from '@heroicons/react/24/outline'
+import { ArrowRightOnRectangleIcon, Cog6ToothIcon, ShoppingBagIcon, PencilSquareIcon, ClockIcon } from '@heroicons/react/24/outline'
 import { Shell } from '../components/common/Shell'
 import { Card } from '../components/common/Card'
 import { PageTransition } from '../components/common/PageTransition'
@@ -16,9 +16,14 @@ export function Menu() {
 
   const signOut = useMutation({
     mutationFn: () => authApi.telegramLogout(),
-    onSuccess: async () => {
+    onSuccess: () => {
+      // Synchronous cache write, not invalidate-and-refetch: a real network
+      // round-trip here would race AuthGate's own redirect (it re-renders
+      // the instant setAnonymous() fires, before navigate() below even
+      // runs), which is what caused sign-out to bounce back into the app
+      // and need a second click.
+      qc.setQueryData(['auth-me'], null)
       setAnonymous()
-      await qc.invalidateQueries({ queryKey: ['auth-me'] })
       navigate('/login', { replace: true })
     },
   })
@@ -86,6 +91,15 @@ export function Menu() {
           >
             <ClockIcon className="h-4 w-4" />
             View past splits
+          </button>
+
+          <button
+            type="button"
+            onClick={() => navigate('/account')}
+            className="flex w-full min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl py-3 text-sm font-medium text-text-muted hover:text-text"
+          >
+            <Cog6ToothIcon className="h-4 w-4" />
+            Account settings
           </button>
         </div>
       </PageTransition>

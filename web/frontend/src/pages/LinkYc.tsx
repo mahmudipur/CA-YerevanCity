@@ -12,6 +12,7 @@ import { authApi } from '../api/endpoints'
 import { ApiError } from '../api/client'
 import { PageTransition } from '../components/common/PageTransition'
 import { COUNTRY_CODES, DEFAULT_COUNTRY } from '../data/countryCodes'
+import { useAuthStore } from '../store/authStore'
 
 function detectCountryCode(e164?: string | null): string {
   if (!e164) return DEFAULT_COUNTRY.code
@@ -25,6 +26,8 @@ function detectCountryCode(e164?: string | null): string {
 export function LinkYc() {
   const navigate = useNavigate()
   const qc = useQueryClient()
+  const user = useAuthStore((s) => s.user)
+  const setUser = useAuthStore((s) => s.setUser)
   const { data: status, isLoading: statusLoading } = useQuery({ queryKey: ['auth-status'], queryFn: authApi.status })
 
   // Always start on the phone step — never assume a code was already sent
@@ -50,10 +53,17 @@ export function LinkYc() {
 
   const verify = useMutation({
     mutationFn: () => authApi.verify(code, sentTo),
-    onSuccess: async () => {
+    onSuccess: () => {
       setError(null)
-      await qc.invalidateQueries({ queryKey: ['auth-status'] })
-      await qc.invalidateQueries({ queryKey: ['auth-me'] })
+      qc.invalidateQueries({ queryKey: ['auth-status'] })
+      // Patch yc_linked locally rather than invalidate-and-refetch — see
+      // Menu.tsx's sign-out handler for why an async refetch racing the
+      // navigate() below would bounce the redirect back to /link-yc.
+      if (user) {
+        const updated = { ...user, yc_linked: true }
+        setUser(updated)
+        qc.setQueryData(['auth-me'], updated)
+      }
       navigate('/', { replace: true })
     },
     onError: (e) => setError(e instanceof ApiError ? e.message : 'Verification failed.'),
