@@ -12,8 +12,8 @@ from .services.user_store import AuthedUser
 def get_current_user(yc_session: str | None = Cookie(default=None)) -> AuthedUser:
     if not yc_session:
         raise HTTPException(status_code=401, detail="Not signed in.")
-    telegram_id = app_session.verify_session_token(yc_session)
-    user = user_store.get(telegram_id)
+    user_id = app_session.verify_session_token(yc_session)
+    user = user_store.get(user_id)
     if user is None:
         raise HTTPException(status_code=401, detail="Account not found. Please sign in again.")
     return user

@@ -57,11 +57,11 @@ def create_session(body: CreateSessionBody, user: AuthedUser = Depends(get_curre
         order = yc_adapter.load_cached_order(user, body.order_id)
         items = [it for it in order["items"]]
         session = session_store.create(
-            user.telegram_id, kind="yc", order_id=body.order_id, order=order, items=items
+            user.id, kind="yc", order_id=body.order_id, order=order, items=items
         )
     else:
         session_name = (body.session_name or "").strip() or "manual"
-        session = session_store.create(user.telegram_id, kind="manual", session_name=session_name, items=[])
+        session = session_store.create(user.id, kind="manual", session_name=session_name, items=[])
 
     session.participants = _default_participants(user)
     return _session_view(session)
@@ -69,12 +69,12 @@ def create_session(body: CreateSessionBody, user: AuthedUser = Depends(get_curre
 
 @router.get("/{session_id}")
 def get_session(session_id: str, user: AuthedUser = Depends(get_current_user)):
-    return _session_view(session_store.get(session_id, user.telegram_id))
+    return _session_view(session_store.get(session_id, user.id))
 
 
 @router.post("/{session_id}/roster")
 def set_roster(session_id: str, body: RosterBody, user: AuthedUser = Depends(get_current_user)):
-    session = session_store.get(session_id, user.telegram_id)
+    session = session_store.get(session_id, user.id)
     defaults = _default_participants(user)
     temp = [p.strip() for p in body.temp_participants if p.strip()]
     session.participants = defaults + temp
@@ -83,7 +83,7 @@ def set_roster(session_id: str, body: RosterBody, user: AuthedUser = Depends(get
 
 @router.post("/{session_id}/items")
 def add_manual_item(session_id: str, body: ManualItemBody, user: AuthedUser = Depends(get_current_user)):
-    session = session_store.get(session_id, user.telegram_id)
+    session = session_store.get(session_id, user.id)
     if session.kind != "manual":
         raise HTTPException(status_code=400, detail="Items can only be added directly for manual sessions.")
     price = int(round(body.price))
@@ -109,7 +109,7 @@ def import_manual_items(
     parse_service()/net_price math as the single-item add — no new
     calculation logic, just a batched version of add_manual_item.
     """
-    session = session_store.get(session_id, user.telegram_id)
+    session = session_store.get(session_id, user.id)
     if session.kind != "manual":
         raise HTTPException(status_code=400, detail="Items can only be imported for manual sessions.")
     if not body.items:
@@ -144,7 +144,7 @@ def import_manual_items(
 
 @router.delete("/{session_id}/items/{index}")
 def remove_manual_item(session_id: str, index: int, user: AuthedUser = Depends(get_current_user)):
-    session = session_store.get(session_id, user.telegram_id)
+    session = session_store.get(session_id, user.id)
     if session.kind != "manual":
         raise HTTPException(status_code=400, detail="Items can only be removed directly for manual sessions.")
     if index < 0 or index >= len(session.items):
@@ -156,7 +156,7 @@ def remove_manual_item(session_id: str, index: int, user: AuthedUser = Depends(g
 
 @router.get("/{session_id}/items/{index}")
 def get_item(session_id: str, index: int, user: AuthedUser = Depends(get_current_user)):
-    session = session_store.get(session_id, user.telegram_id)
+    session = session_store.get(session_id, user.id)
     active = session.active_items()
     if index < 0 or index >= len(active):
         raise HTTPException(status_code=404, detail="Item index out of range.")
@@ -171,7 +171,7 @@ def get_item(session_id: str, index: int, user: AuthedUser = Depends(get_current
 
 @router.post("/{session_id}/items/{index}/assign")
 def assign_item(session_id: str, index: int, body: AssignBody, user: AuthedUser = Depends(get_current_user)):
-    session = session_store.get(session_id, user.telegram_id)
+    session = session_store.get(session_id, user.id)
     active = session.active_items()
     if index < 0 or index >= len(active):
         raise HTTPException(status_code=404, detail="Item index out of range.")
@@ -196,7 +196,7 @@ def assign_item(session_id: str, index: int, body: AssignBody, user: AuthedUser 
 
 @router.get("/{session_id}/review")
 def review(session_id: str, user: AuthedUser = Depends(get_current_user)):
-    session = session_store.get(session_id, user.telegram_id)
+    session = session_store.get(session_id, user.id)
     active = session.active_items()
     rows = []
     for i, item in enumerate(active):
@@ -207,7 +207,7 @@ def review(session_id: str, user: AuthedUser = Depends(get_current_user)):
 
 @router.post("/{session_id}/finish")
 def finish(session_id: str, user: AuthedUser = Depends(get_current_user)):
-    session = session_store.get(session_id, user.telegram_id)
+    session = session_store.get(session_id, user.id)
     if not session.is_fully_assigned():
         raise HTTPException(status_code=422, detail="Every item must be assigned before finishing.")
 

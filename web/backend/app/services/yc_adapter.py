@@ -4,7 +4,7 @@ _build_order, _parse_date, get_orders, get_order_detail unchanged; replaces
 the CLI's print()/sys.exit() with return values and exceptions so FastAPI
 routes can turn them into JSON responses.
 
-Order caches are namespaced per telegram_id via persistence.scoped_id() —
+Order caches are namespaced per account (user_id) via persistence.scoped_id() —
 same composite-filename approach as split files — so one tenant can never
 read another tenant's cached YC order by guessing/reusing an order_id.
 """
@@ -72,7 +72,7 @@ def fetch_and_cache_order(user: AuthedUser, order_id: str = "", refresh: bool = 
     if not resolved_id:
         raise HTTPException(status_code=502, detail="Could not determine order ID from API response.")
 
-    out_path = TMP_DIR / f"order_{scoped_id(user.telegram_id, resolved_id)}.json"
+    out_path = TMP_DIR / f"order_{scoped_id(user.id, resolved_id)}.json"
 
     if out_path.exists() and not refresh:
         order = json.loads(out_path.read_text())
@@ -94,7 +94,7 @@ def fetch_and_cache_order(user: AuthedUser, order_id: str = "", refresh: bool = 
 
 
 def load_cached_order(user: AuthedUser, order_id: str) -> dict:
-    path = TMP_DIR / f"order_{scoped_id(user.telegram_id, order_id)}.json"
+    path = TMP_DIR / f"order_{scoped_id(user.id, order_id)}.json"
     if not path.exists():
         raise HTTPException(status_code=404, detail=f"Order cache not found for {order_id}.")
     return json.loads(path.read_text())

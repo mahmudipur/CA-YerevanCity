@@ -9,13 +9,13 @@ import json
 import pytest
 from fastapi.testclient import TestClient
 
-from conftest import FIXTURE_PATH, TEST_TELEGRAM_ID, load_fixture_order
+from conftest import FIXTURE_PATH, TEST_USER_ID, load_fixture_order
 
 from app.config import TMP_DIR
 from app.main import app
 
 ORDER_ID = "FIXTURE"
-_SCOPED = f"{TEST_TELEGRAM_ID}_{ORDER_ID}"
+_SCOPED = f"{TEST_USER_ID}_{ORDER_ID}"
 PARTICIPANTS = ["Alice", "Bob", "Carol"]
 
 # (mode, selected, values) per active item, applied identically on both paths.

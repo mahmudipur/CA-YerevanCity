@@ -50,7 +50,7 @@ def send_code_endpoint(request: Request, body: SendCodeBody, user: AuthedUser = 
     device_id = user.yc_device_id
     if not device_id:
         device_id = uuid.uuid4().hex + "tAyn"  # matches auth_yc.py's format
-        user_store.set_yc_secrets(user.telegram_id, device_id=device_id)
+        user_store.set_yc_secrets(user.id, device_id=device_id)
 
     try:
         code = confirm_code()
@@ -75,7 +75,7 @@ def verify_endpoint(request: Request, body: VerifyBody, user: AuthedUser = Depen
     except YCError as e:
         raise HTTPException(status_code=502, detail=f"Verification failed: {e}")
 
-    user_store.set_yc_secrets(user.telegram_id, jwt=jwt, phone_e164=phone_e164)
+    user_store.set_yc_secrets(user.id, jwt=jwt, phone_e164=phone_e164)
     return {"authenticated": True}
 
 
@@ -85,5 +85,5 @@ def logout(user: AuthedUser = Depends(get_current_user)):
     phone/device id are left in place so a fresh sign-in doesn't need to
     re-enter them. Unrelated to /api/auth/telegram/logout, which signs out
     of the app entirely."""
-    user_store.clear_yc_jwt(user.telegram_id)
+    user_store.clear_yc_jwt(user.id)
     return {"authenticated": False}

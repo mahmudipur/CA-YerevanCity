@@ -3,7 +3,7 @@ the way tools/run.py already does (patching sys.argv before calling main()).
 Returns the path to the written CSV.
 
 generate_csv.py hardcodes `TMP_DIR / f"split_{order_id}.json"` — to reuse it
-unmodified under multi-tenancy, we pass it the *composite* `<telegram_id>_<id>`
+unmodified under multi-tenancy, we pass it the *composite* `<user_id>_<id>`
 as its "order_id" argv, matching the composite filenames persistence.py now
 writes. The downloaded filename shown to the user still uses their own
 plain split_id (see routers/export.py).
@@ -20,8 +20,8 @@ from .persistence import scoped_id
 import generate_csv  # noqa: E402
 
 
-def generate(telegram_id: int, split_id: str) -> str:
-    composite = scoped_id(telegram_id, split_id)
+def generate(user_id: int, split_id: str) -> str:
+    composite = scoped_id(user_id, split_id)
     split_path = TMP_DIR / f"split_{composite}.json"
     if not split_path.exists():
         raise HTTPException(status_code=404, detail=f"Split not found for {split_id}.")

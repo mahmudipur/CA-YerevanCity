@@ -11,11 +11,17 @@ for p in (str(BACKEND_DIR), str(TOOLS_DIR)):
     if p not in sys.path:
         sys.path.insert(0, p)
 
+# Tests get their own on-disk SQLite file, never the real data/app.db —
+# otherwise every test run pollutes (or could even be polluted by) actual
+# user accounts. Fixed path (not a fresh tempfile) so re-running the suite
+# reuses/decrypts what a previous run already wrote, same reasoning as the
+# fixed APP_MASTER_KEY below.
+os.environ.setdefault("APP_DB_PATH", str(Path(__file__).parent / "fixtures" / "test.db"))
+
 # Fixed test-only secrets, set before any `app.*` module is imported (so
 # pydantic-settings picks them up) — a real .env's APP_MASTER_KEY must never
 # be used for tests, and re-running the suite with a random key each time
-# would fail to decrypt whatever a previous run already wrote to the shared
-# on-disk .tmp/app.db test DB.
+# would fail to decrypt whatever a previous run already wrote to the test DB.
 os.environ.setdefault("APP_MASTER_KEY", "jDA2XvP4lvsyDIDqUWpJRq2olh5bH4CBilRvYeEMk0I=")
 os.environ.setdefault("APP_SESSION_SECRET", "test-only-session-secret-do-not-use-in-prod")
 os.environ.setdefault("TELEGRAM_BOT_TOKEN", "123456:TEST-BOT-TOKEN-not-real")
@@ -42,14 +48,34 @@ def load_fixture_order() -> dict:
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
-from app.db import init_db  # noqa: E402
+from app.db import init_db, session_scope  # noqa: E402
 from app.dependencies import get_current_user, require_yc_linked  # noqa: E402
 from app.main import app  # noqa: E402
+from app.models.user import User  # noqa: E402
+from app.rate_limit import limiter  # noqa: E402
 from app.services import user_store  # noqa: E402
 
-TEST_TELEGRAM_ID = 999001
+
+@pytest.fixture(autouse=True)
+def _reset_backend_state():
+    """Runs before every test: ensures the DB schema exists (a bare
+    TestClient(app) — the common pattern in this suite — never triggers the
+    app's lifespan startup that would otherwise call init_db()), and clears
+    slowapi's rate-limit counters so one test's requests don't count against
+    another's limit (TestClient always presents the same fake IP)."""
+    init_db()
+    limiter.reset()
+
+# The tenant-scoping key is User.id (generic — a password-only account has
+# no telegram_id), not telegram_id. Tests create this row at a fixed,
+# explicit id (SQLite allows inserting a chosen INTEGER PRIMARY KEY) so
+# expected file paths built from this constant are deterministic across
+# runs, the same way the real app scopes by whatever id the DB assigned.
+TEST_USER_ID = 999001
 
 _DEFAULTS = dict(
+    telegram_id=None,
+    telegram_username=None,
     username="test_user",
     first_name="Test",
     last_name=None,
@@ -64,7 +90,7 @@ _DEFAULTS = dict(
 
 @pytest.fixture
 def authed_user_factory():
-    """Creates/resets a real row for TEST_TELEGRAM_ID in the (real, on-disk
+    """Creates/resets a real row at TEST_USER_ID in the (real, on-disk
     test) SQLite store and overrides get_current_user/require_yc_linked to
     re-fetch it fresh on every dependency resolution — so route handlers
     that mutate the row (e.g. logout) are reflected on the next request,
@@ -74,22 +100,27 @@ def authed_user_factory():
     def _make(**overrides):
         cfg = {**_DEFAULTS, **overrides}
         init_db()
-        user_store.get_or_create(
-            TEST_TELEGRAM_ID,
-            username=cfg["username"],
-            first_name=cfg["first_name"],
-            last_name=cfg["last_name"],
-            photo_url=cfg["photo_url"],
-        )
-        user_store.set_default_participants(TEST_TELEGRAM_ID, cfg["default_participants"])
+        with session_scope() as db:
+            row = db.get(User, TEST_USER_ID)
+            if row is None:
+                row = User(id=TEST_USER_ID)
+                db.add(row)
+            row.telegram_id = cfg["telegram_id"]
+            row.telegram_username = cfg["telegram_username"]
+            row.username = cfg["username"]
+            row.first_name = cfg["first_name"]
+            row.last_name = cfg["last_name"]
+            row.photo_url = cfg["photo_url"]
+            db.commit()
+        user_store.set_default_participants(TEST_USER_ID, cfg["default_participants"])
         user_store.set_yc_secrets(
-            TEST_TELEGRAM_ID,
+            TEST_USER_ID,
             phone_local=cfg["yc_phone_local"],
             phone_e164=cfg["yc_phone_e164"],
             device_id=cfg["yc_device_id"],
             jwt=cfg["yc_jwt"],
         )
-        fetch = lambda: user_store.get(TEST_TELEGRAM_ID)  # noqa: E731 - re-reads DB, not a frozen snapshot
+        fetch = lambda: user_store.get(TEST_USER_ID)  # noqa: E731 - re-reads DB, not a frozen snapshot
         app.dependency_overrides[get_current_user] = fetch
         app.dependency_overrides[require_yc_linked] = fetch
         return fetch()

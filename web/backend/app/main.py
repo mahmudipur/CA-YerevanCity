@@ -10,7 +10,7 @@ from . import sys_path  # noqa: F401  (side effect: primes sys.path for tools/)
 from .config import FRONTEND_DIST
 from .db import init_db
 from .rate_limit import limiter
-from .routers import auth, export, history, orders, payment, receipt, sessions, telegram_auth
+from .routers import auth, export, history, orders, password_auth, payment, receipt, sessions, telegram_auth
 
 
 @asynccontextmanager
@@ -25,6 +25,7 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 app.include_router(telegram_auth.router)
 app.include_router(telegram_auth.me_router)
+app.include_router(password_auth.router)
 app.include_router(auth.router)
 app.include_router(orders.router)
 app.include_router(sessions.router)

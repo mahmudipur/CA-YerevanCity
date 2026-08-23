@@ -30,7 +30,7 @@ def test_callback_issues_cookie_and_me_reflects_it(monkeypatch):
     assert resp.status_code == 200, resp.text
     body = resp.json()
     assert body["telegram_id"] == TEST_ID
-    assert body["username"] == "ada_lovelace"
+    assert body["telegram_username"] == "ada_lovelace"
     assert body["yc_linked"] is False
     assert "yc_session" in resp.cookies
 

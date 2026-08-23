@@ -8,7 +8,7 @@ import json
 
 import pytest
 
-from conftest import TEST_TELEGRAM_ID
+from conftest import TEST_USER_ID
 from app.config import TMP_DIR
 from app.services import yc_adapter
 from app.services.user_store import AuthedUser
@@ -16,17 +16,22 @@ from app.services.user_store import AuthedUser
 ORDER_ID = "STALE_CACHE_TEST"
 
 FAKE_USER = AuthedUser(
-    telegram_id=TEST_TELEGRAM_ID,
+    id=TEST_USER_ID,
+    telegram_id=None,
     telegram_username=None,
+    username="test_user",
     first_name="Test",
     last_name=None,
     photo_url=None,
+    email=None,
     default_participants="Me",
     google_sheet_id=None,
     yc_phone_local="",
     yc_phone_e164="",
     yc_device_id="",
     yc_jwt="fake-jwt",
+    has_password=False,
+    has_recovery_code=False,
 )
 
 
@@ -53,7 +58,7 @@ def old_shaped_cache():
              "total_price": 1000, "discount": 0, "net_price": 1000, "is_canceled": False},
         ],
     }
-    path = TMP_DIR / f"order_{TEST_TELEGRAM_ID}_{ORDER_ID}.json"
+    path = TMP_DIR / f"order_{TEST_USER_ID}_{ORDER_ID}.json"
     path.write_text(json.dumps(order))
     yield path
     path.unlink(missing_ok=True)

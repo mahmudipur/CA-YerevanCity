@@ -55,11 +55,13 @@ def test_cross_tenant_session_access_returns_404_over_http():
     authenticated telegram_id) must get 404 trying to fetch it by id."""
     from app.services.user_store import AuthedUser
 
-    def fake_user(tid):
+    def fake_user(uid):
         return AuthedUser(
-            telegram_id=tid, telegram_username=None, first_name="T", last_name=None,
-            photo_url=None, default_participants="Me", google_sheet_id=None,
+            id=uid, telegram_id=None, telegram_username=None, username=f"user{uid}",
+            first_name="T", last_name=None, photo_url=None, email=None,
+            default_participants="Me", google_sheet_id=None,
             yc_phone_local="", yc_phone_e164="", yc_device_id="", yc_jwt="",
+            has_password=False, has_recovery_code=False,
         )
 
     from fastapi.testclient import TestClient

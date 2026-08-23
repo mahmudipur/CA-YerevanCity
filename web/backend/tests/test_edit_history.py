@@ -5,12 +5,12 @@ import json
 
 import pytest
 
-from conftest import TEST_TELEGRAM_ID
+from conftest import TEST_USER_ID
 
 from app.config import TMP_DIR
 
 SPLIT_ID = "edit_smoke_cafe"  # must equal slugify(session_name) below — that's the real invariant manual_split.py relies on
-_SCOPED = f"{TEST_TELEGRAM_ID}_{SPLIT_ID}"
+_SCOPED = f"{TEST_USER_ID}_{SPLIT_ID}"
 
 
 @pytest.fixture

@@ -6,12 +6,12 @@ import json
 
 import pytest
 
-from conftest import TEST_TELEGRAM_ID, load_fixture_order
+from conftest import TEST_USER_ID, load_fixture_order
 
 from app.config import TMP_DIR
 
 SPLIT_ID = "CSV_SMOKE"
-_SCOPED = f"{TEST_TELEGRAM_ID}_{SPLIT_ID}"
+_SCOPED = f"{TEST_USER_ID}_{SPLIT_ID}"
 
 
 @pytest.fixture

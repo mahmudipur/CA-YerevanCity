@@ -1,10 +1,12 @@
-"""Reads/writes .tmp/order_*.json and .tmp/split_*.json. Per-user isolation
-is done by prefixing the telegram_id onto the filename (split_<tid>_<id>.json)
-rather than a per-user subdirectory — this keeps the reused CLI scripts
-(generate_csv.py, which hardcodes `TMP_DIR / f"split_{order_id}.json"`)
-working unmodified: callers just pass the composite `"<tid>_<id>"` as the id
-those scripts expect. See yc_adapter.py / csv_service.py for the same
-pattern applied to order caches and CSV reports.
+"""Reads/writes data/order_*.json and data/split_*.json (persistent — not
+.tmp/, see config.py). Per-user isolation
+is done by prefixing the account's user_id onto the filename
+(split_<uid>_<id>.json) rather than a per-user subdirectory — this keeps
+the reused CLI scripts (generate_csv.py, which hardcodes
+`TMP_DIR / f"split_{order_id}.json"`) working unmodified: callers just pass
+the composite `"<uid>_<id>"` as the id those scripts expect. See
+yc_adapter.py / csv_service.py for the same pattern applied to order caches
+and CSV reports.
 """
 
 import json
@@ -30,27 +32,27 @@ def validate_id(value: str) -> str:
     return value
 
 
-def scoped_id(telegram_id: int, raw_id: str) -> str:
+def scoped_id(user_id: int, raw_id: str) -> str:
     """The composite id embedded in filenames — never returned to a client;
     routers/services only ever hand back the caller's own `raw_id`."""
-    return f"{telegram_id}_{validate_id(raw_id)}"
+    return f"{user_id}_{validate_id(raw_id)}"
 
 
-def save_split(telegram_id: int, split_id: str, split_data: dict) -> str:
-    out_path = TMP_DIR / f"split_{scoped_id(telegram_id, split_id)}.json"
+def save_split(user_id: int, split_id: str, split_data: dict) -> str:
+    out_path = TMP_DIR / f"split_{scoped_id(user_id, split_id)}.json"
     out_path.write_text(json.dumps(split_data, indent=2, ensure_ascii=False, default=str))
     return str(out_path)
 
 
-def load_split(telegram_id: int, split_id: str) -> dict:
-    path = TMP_DIR / f"split_{scoped_id(telegram_id, split_id)}.json"
+def load_split(user_id: int, split_id: str) -> dict:
+    path = TMP_DIR / f"split_{scoped_id(user_id, split_id)}.json"
     if not path.exists():
         raise HTTPException(status_code=404, detail=f"Split not found for {split_id}.")
     return json.loads(path.read_text())
 
 
-def list_splits(telegram_id: int) -> list[dict]:
-    prefix = f"split_{telegram_id}_"
+def list_splits(user_id: int) -> list[dict]:
+    prefix = f"split_{user_id}_"
     rows = []
     for path in sorted(TMP_DIR.glob(f"{prefix}*.json"), key=lambda p: p.stat().st_mtime, reverse=True):
         try:
