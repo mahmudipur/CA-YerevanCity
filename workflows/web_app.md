@@ -184,6 +184,23 @@ changed, no test pinned the old shape. Manual-expense items have no photo
 (there's no product catalog for those), so `image` is simply absent/`null`
 there and the UI just doesn't render a thumbnail.
 
+## Tricount receipt image
+
+The CSV report has no on-screen equivalent, so the natural workaround —
+open the CSV in a spreadsheet app and screenshot it to paste into Tricount
+as a receipt — falls apart on a phone: the sheet doesn't fit one screen, so
+a screenshot only captures whatever's currently visible.
+`GET /api/sessions/{split_id}/image` (button on the Done screen and on each
+History row) renders the exact same rows as `generate_csv.py` — same
+column layout, same math, refactored into a shared `build_report_rows()` so
+neither format duplicates the other's logic — as a single PNG
+(`tools/generate_receipt_image.py`, Pillow) sized to fit every row. One
+download, no scrolling, works identically on a phone or a laptop. On
+mobile the frontend uses the Web Share API when available (`useShareOrDownload.ts`)
+so tapping the button opens the native share sheet straight into Photos or
+Tricount's own attachment picker, falling back to a normal download link
+everywhere else.
+
 ## Editing a past split
 
 `History` → the pencil icon on any row re-opens that split as a new editable

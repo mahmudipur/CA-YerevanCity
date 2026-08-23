@@ -12,8 +12,9 @@ Split Yerevan City grocery orders (and any manual expense) item-by-item among a 
 | 2 | `fetch_order.py` | Pull your latest YC order from the API, cache it locally |
 | 3 | `split_basket.py` | Walk through each item interactively and assign it to people |
 | 4 | `generate_csv.py` | Write a Tricount-compatible CSV report |
+| 5 | `generate_receipt_image.py` | Render the same report as one PNG — no CSV/spreadsheet screenshot needed, works the same on a phone as a laptop |
 
-**Shortcut:** `run.py` chains all four steps into a single interactive session, and also supports manual expenses (restaurants, cafes, etc.).
+**Shortcut:** `run.py` chains steps 1-4 into a single interactive session, and also supports manual expenses (restaurants, cafes, etc.).
 
 ---
 
@@ -99,6 +100,10 @@ Add `--refresh` to force a fresh fetch even if the order is already cached:
 
 # 3. Generate CSV report (produces data/report_<id>.csv)
 .venv/bin/python tools/generate_csv.py KM0030XXXXXX
+
+# 3b. ...or a single PNG image of the same report — no spreadsheet
+#     screenshot needed, and it fits on a phone screen unlike one
+.venv/bin/python tools/generate_receipt_image.py KM0030XXXXXX
 
 # 4. Open it
 open data/report_KM0030XXXXXX.csv
@@ -202,9 +207,11 @@ tools/
   split_basket.py             # interactive item splitter → data/split_<id>.json
   manual_split.py             # manual expense splitter → data/split_<slug>.json
   generate_csv.py             # CSV report → data/report_<id>.csv
+  generate_receipt_image.py   # same report as one PNG → data/receipt_<id>.png
   run.py                      # full pipeline with interactive menu
   yc_client.py                # Yerevan City API client (auth, orders)
 workflows/
   split_order.md              # detailed SOP with edge cases and API quirks
-.tmp/                         # generated files (gitignored, safe to delete)
+data/                         # real records — splits, order caches, reports (gitignored, NOT disposable — see CLAUDE.md)
+.tmp/                         # currently empty/unused — reserved for genuinely disposable scratch files
 ```
