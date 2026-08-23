@@ -3,6 +3,9 @@ import { AnimatePresence } from 'framer-motion'
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { Login } from './pages/Login'
+import { Signup } from './pages/Signup'
+import { ForgotPassword } from './pages/ForgotPassword'
+import { Account } from './pages/Account'
 import { LinkYc } from './pages/LinkYc'
 import { Menu } from './pages/Menu'
 import { Orders } from './pages/Orders'
@@ -21,10 +24,13 @@ import { Spinner } from './components/common/Spinner'
 import { authApi } from './api/endpoints'
 import { useAuthStore } from './store/authStore'
 
-/** First real route guard in this app. Three states: not logged into
- * Telegram at all -> only /login is reachable; logged in but haven't linked
- * a Yerevan City account yet -> only /link-yc is reachable; fully set up ->
- * everything else, and /login and /link-yc redirect away. */
+const ANONYMOUS_PATHS = ['/login', '/signup', '/forgot-password']
+
+/** First real route guard in this app. Three states: not signed in at all
+ * (by either Telegram or username/password) -> only the anonymous-auth
+ * pages are reachable; signed in but haven't linked a Yerevan City account
+ * yet -> only /link-yc is reachable; fully set up -> everything else, and
+ * the anonymous-auth pages/link-yc redirect away. */
 function AuthGate({ children }: { children: React.ReactNode }) {
   const location = useLocation()
   const { status, user, setUser, setAnonymous } = useAuthStore()
@@ -52,12 +58,12 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   const path = location.pathname
 
   if (status === 'anonymous') {
-    return path === '/login' ? <>{children}</> : <Navigate to="/login" replace />
+    return ANONYMOUS_PATHS.includes(path) ? <>{children}</> : <Navigate to="/login" replace />
   }
 
   // authenticated
-  if (path === '/login') return <Navigate to={user?.yc_linked ? '/' : '/link-yc'} replace />
-  if (!user?.yc_linked && path !== '/link-yc') return <Navigate to="/link-yc" replace />
+  if (ANONYMOUS_PATHS.includes(path)) return <Navigate to={user?.yc_linked ? '/' : '/link-yc'} replace />
+  if (!user?.yc_linked && path !== '/link-yc' && path !== '/account') return <Navigate to="/link-yc" replace />
   return <>{children}</>
 }
 
@@ -68,6 +74,9 @@ export default function App() {
       <AnimatePresence mode="wait" initial={false}>
         <Routes location={location} key={location.pathname}>
           <Route path="/login" element={<Login />} />
+          <Route path="/signup" element={<Signup />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/account" element={<Account />} />
           <Route path="/link-yc" element={<LinkYc />} />
           <Route path="/" element={<Menu />} />
           <Route path="/orders" element={<Orders />} />

@@ -1,12 +1,12 @@
 import { create } from 'zustand'
-import type { TelegramUser } from '../api/types'
+import type { UserProfile } from '../api/types'
 
 type AuthStatus = 'loading' | 'authenticated' | 'anonymous'
 
 interface AuthState {
-  user: TelegramUser | null
+  user: UserProfile | null
   status: AuthStatus
-  setUser: (u: TelegramUser) => void
+  setUser: (u: UserProfile) => void
   setAnonymous: () => void
 }
 
