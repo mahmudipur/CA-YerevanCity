@@ -5,5 +5,11 @@ fastapi==0.115.14
 uvicorn[standard]==0.32.1
 pydantic-settings==2.15.0
 
+# Multi-tenant auth/storage
+sqlalchemy==2.0.52      # users table ORM (sync engine, stdlib sqlite3 driver); >=2.0.37 needed for Python 3.13/3.14 typing compat
+cryptography==43.0.3    # Fernet — encrypts per-user YC secrets at rest
+itsdangerous==2.2.0     # signs the app session cookie
+slowapi==0.1.9          # rate limiting (login, OTP endpoints)
+
 # test-only (FastAPI TestClient)
 httpx==0.28.1
