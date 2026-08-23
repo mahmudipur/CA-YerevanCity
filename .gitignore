@@ -4,10 +4,18 @@ credentials.json
 token.json
 __pycache__/
 *.pyc
+.pytest_cache/
 .DS_Store
+
+# Python virtualenvs (any name — this repo has used both .venv/ and .venv-web/)
+.venv/
+.venv-web/
+
+# Claude Code local tooling — machine-specific config, session memory, and a
+# synced marketplace skills cache; none of it is part of this app.
+.claude/
+.remember/
 
 # Web app
 web/frontend/node_modules/
 web/frontend/dist/
-web/backend/.pytest_cache/
-.venv-web/
