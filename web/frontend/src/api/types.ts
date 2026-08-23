@@ -148,3 +148,27 @@ export interface AuthStatus {
   phone_e164: string | null
   phone_local: string | null
 }
+
+export interface TelegramConfig {
+  bot_username: string
+  domain: string
+}
+
+export interface TelegramLoginPayload {
+  id: number
+  first_name: string
+  last_name?: string
+  username?: string
+  photo_url?: string
+  auth_date: number
+  hash: string
+}
+
+export interface TelegramUser {
+  telegram_id: number
+  username: string | null
+  first_name: string
+  last_name: string | null
+  photo_url: string | null
+  yc_linked: boolean
+}

@@ -11,9 +11,20 @@ import type {
   SaveResponse,
   SessionView,
   SplitMode,
+  TelegramConfig,
+  TelegramLoginPayload,
+  TelegramUser,
 } from './types'
 
 export const authApi = {
+  // App-level login (Telegram) — separate from the YC-linking flow below.
+  telegramConfig: () => api.get<TelegramConfig>('/auth/telegram/config'),
+  telegramCallback: (payload: TelegramLoginPayload) =>
+    api.post<TelegramUser>('/auth/telegram/callback', payload),
+  telegramLogout: () => api.post<{ signed_out: boolean }>('/auth/telegram/logout'),
+  me: () => api.get<TelegramUser>('/auth/me'),
+
+  // Per-user "link my Yerevan City account" OTP flow.
   status: () => api.get<AuthStatus>('/auth/status'),
   sendCode: (phone_local?: string, phone_e164?: string) =>
     api.post<{ sent: boolean; phone_e164: string }>('/auth/send-code', { phone_local, phone_e164 }),

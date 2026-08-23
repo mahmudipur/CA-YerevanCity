@@ -9,6 +9,7 @@ export class ApiError extends Error {
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const res = await fetch(`/api${path}`, {
     headers: { 'Content-Type': 'application/json' },
+    credentials: 'include', // send the httpOnly app-session cookie
     ...options,
   })
   if (!res.ok) {
