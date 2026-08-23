@@ -17,7 +17,7 @@ import sys
 from pathlib import Path
 
 ROOT    = Path(__file__).parent.parent
-TMP_DIR = ROOT / ".tmp"
+TMP_DIR = ROOT / "data"
 
 
 # ── Weights and exact decimal amounts ────────────────────────────────────────

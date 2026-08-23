@@ -2,9 +2,9 @@
 """
 Interactive per-item basket splitter.
 
-Loads .tmp/order_{id}.json, walks through each active item and asks how to
+Loads data/order_{id}.json, walks through each active item and asks how to
 split it, then computes per-person totals (including proportional fee
-allocation) and writes .tmp/split_{id}.json.
+allocation) and writes data/split_{id}.json.
 
 Usage:
   python tools/split_basket.py <order_id>
@@ -34,7 +34,7 @@ import interactive
 
 ROOT     = Path(__file__).parent.parent
 ENV_PATH = ROOT / ".env"
-TMP_DIR  = ROOT / ".tmp"
+TMP_DIR  = ROOT / "data"
 
 SEP     = "─" * 60
 SEP_DBL = "═" * 60

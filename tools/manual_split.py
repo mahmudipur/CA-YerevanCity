@@ -29,7 +29,7 @@ from split_basket import (
 
 ROOT     = Path(__file__).parent.parent
 ENV_PATH = ROOT / ".env"
-TMP_DIR  = ROOT / ".tmp"
+TMP_DIR  = ROOT / "data"
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────

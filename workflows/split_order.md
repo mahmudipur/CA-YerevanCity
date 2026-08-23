@@ -41,7 +41,7 @@
 - Reads `YC_JWT` from `.env`
 - Calls `GET /Order/UserAllOrdersPaged` (page 1, count 1)
 - Fetches full detail via `GET /Order/GetOfflineOrderById`
-- Caches result to `.tmp/order_{order_id}.json`
+- Caches result to `data/order_{order_id}.json`
 
 **If it fails with "Unauthorized":** JWT expired — run `auth_yc.py` first.
 
@@ -90,7 +90,7 @@ Example:
      - Total EUR paid (as shown in Revolut)
      - Whether the purchase was made on a **weekend** (Sat/Sun) — if yes, a 1% Revolut exchange markup is added on top of the paid EUR amount
    - Prints per-person EUR shares and saves to split file
-6. Saves `.tmp/split_{order_id}.json`
+6. Saves `data/split_{order_id}.json`
 
 **Assignment input formats:**
 
@@ -115,8 +115,8 @@ Example:
 ```
 
 **What it does:**
-- Reads `.tmp/split_{order_id}.json`
-- Writes `.tmp/report_{order_id}.csv` in the Tricount tracking format:
+- Reads `data/split_{order_id}.json`
+- Writes `data/report_{order_id}.csv` in the Tricount tracking format:
 
 | Column group | Columns |
 |---|---|
@@ -131,7 +131,7 @@ Footer rows:
 
 **Open the file:**
 ```bash
-open .tmp/report_<order_id>.csv
+open data/report_<order_id>.csv
 ```
 
 **If the file already exists:** It is overwritten (idempotent — safe to re-run).
@@ -149,7 +149,7 @@ cd /Users/mmpdev/develop/CA-YerevanCity
 .venv/bin/python tools/fetch_order.py
 .venv/bin/python tools/split_basket.py <order_id_from_above>
 .venv/bin/python tools/generate_csv.py <order_id_from_above>
-open .tmp/report_<order_id_from_above>.csv
+open data/report_<order_id_from_above>.csv
 ```
 
 ---
@@ -173,8 +173,8 @@ open .tmp/report_<order_id_from_above>.csv
 | File | Purpose | Regenerate? |
 |---|---|---|
 | `.env` | Config, credentials | Never overwrite manually except via `auth_yc.py` |
-| `.tmp/order_{id}.json` | Raw order cache | Yes — `fetch_order.py --refresh` |
-| `.tmp/split_{id}.json` | Computed split | Yes — re-run `split_basket.py` |
+| `data/order_{id}.json` | Raw order cache | Yes — `fetch_order.py --refresh` |
+| `data/split_{id}.json` | **Your actual split record** | **No** — re-running `split_basket.py` produces a *new* split, not a recovery of a lost one. Back this up; never delete `data/`. |
 | `.venv/` | Python packages | `python3 -m venv .venv && .venv/bin/pip install ...` |
 
 ---

@@ -1,5 +1,8 @@
 """Settings for the web backend. Reads the same root .env the CLI uses."""
 
+import os
+from pathlib import Path
+
 from dotenv import load_dotenv
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -7,11 +10,24 @@ from . import sys_path  # noqa: F401  (side effect: primes sys.path for tools/)
 
 REPO_ROOT = sys_path.REPO_ROOT
 ENV_PATH = REPO_ROOT / ".env"
-TMP_DIR = REPO_ROOT / ".tmp"
 FRONTEND_DIST = REPO_ROOT / "web" / "frontend" / "dist"
-DB_PATH = TMP_DIR / "app.db"
+# Every real record this app produces — accounts, and every split/order/
+# report file (`persistence.py`, `yc_adapter.py`, `csv_service.py`) — lives
+# here, not under `.tmp/`. `.tmp/` is documented (root CLAUDE.md) and
+# treated as disposable/regenerable; nothing a user would consider "my
+# data" may live somewhere that convention, or a stray `rm -rf .tmp`,
+# could wipe. TMP_DIR is kept as an alias (rather than renaming every call
+# site) precisely because there is no longer a meaningful distinction for
+# this app: everything it writes is real data.
+DATA_DIR = REPO_ROOT / "data"
+TMP_DIR = DATA_DIR
+# APP_DB_PATH override exists so the test suite (see tests/conftest.py) gets
+# its own throwaway database instead of ever sharing — and potentially
+# polluting or being polluted by — the real one.
+DB_PATH = Path(os.environ["APP_DB_PATH"]) if os.environ.get("APP_DB_PATH") else DATA_DIR / "app.db"
 
-TMP_DIR.mkdir(exist_ok=True)
+DATA_DIR.mkdir(exist_ok=True)
+DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 
 # Loaded here (not just by env_store) so Settings below sees these vars
 # regardless of import order.

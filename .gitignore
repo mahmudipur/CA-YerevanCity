@@ -19,3 +19,7 @@ __pycache__/
 # Web app
 web/frontend/node_modules/
 web/frontend/dist/
+# Persistent user accounts DB — real secrets, back this up; NOT disposable
+# like .tmp/, just kept out of git the same way .env is.
+/data/
+web/backend/tests/fixtures/test.db

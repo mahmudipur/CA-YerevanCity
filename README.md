@@ -91,17 +91,17 @@ Add `--refresh` to force a fresh fetch even if the order is already cached:
 ### Option B — step by step
 
 ```bash
-# 1. Fetch latest order (cached to .tmp/order_<id>.json)
+# 1. Fetch latest order (cached to data/order_<id>.json)
 .venv/bin/python tools/fetch_order.py
 
-# 2. Split items interactively (produces .tmp/split_<id>.json)
+# 2. Split items interactively (produces data/split_<id>.json)
 .venv/bin/python tools/split_basket.py KM0030XXXXXX
 
-# 3. Generate CSV report (produces .tmp/report_<id>.csv)
+# 3. Generate CSV report (produces data/report_<id>.csv)
 .venv/bin/python tools/generate_csv.py KM0030XXXXXX
 
 # 4. Open it
-open .tmp/report_KM0030XXXXXX.csv
+open data/report_KM0030XXXXXX.csv
 ```
 
 ---
@@ -198,10 +198,10 @@ These are added for the current run only and not saved to `.env`.
 .env                          # credentials and config (gitignored)
 tools/
   auth_yc.py                  # phone OTP login → saves JWT
-  fetch_order.py              # fetch latest YC order → .tmp/order_<id>.json
-  split_basket.py             # interactive item splitter → .tmp/split_<id>.json
-  manual_split.py             # manual expense splitter → .tmp/split_<slug>.json
-  generate_csv.py             # CSV report → .tmp/report_<id>.csv
+  fetch_order.py              # fetch latest YC order → data/order_<id>.json
+  split_basket.py             # interactive item splitter → data/split_<id>.json
+  manual_split.py             # manual expense splitter → data/split_<slug>.json
+  generate_csv.py             # CSV report → data/report_<id>.csv
   run.py                      # full pipeline with interactive menu
   yc_client.py                # Yerevan City API client (auth, orders)
 workflows/

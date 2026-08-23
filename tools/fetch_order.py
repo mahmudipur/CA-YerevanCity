@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Fetch the latest Yerevan City order and cache it to .tmp/order_{id}.json
+Fetch the latest Yerevan City order and cache it to data/order_{id}.json
 
 The cached JSON is the canonical input for split_basket.py.
 
@@ -22,7 +22,7 @@ from yc_client import YCError, get_order_detail, get_orders
 
 ROOT    = Path(__file__).parent.parent
 ENV_PATH = ROOT / ".env"
-TMP_DIR  = ROOT / ".tmp"
+TMP_DIR  = ROOT / "data"
 
 # API timestamps (createDate/finishDate) are UTC with no offset. Yerevan City's
 # GetOfflineOrderById joins line items by the LOCAL calendar date, so an order
