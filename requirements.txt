@@ -3,3 +3,4 @@ python-dotenv==1.2.2
 requests-oauthlib==2.0.0
 questionary==2.0.1
 pytest==8.3.4
+Pillow==12.3.0    # generate_receipt_image.py — renders the split as a PNG (Tricount receipt image)

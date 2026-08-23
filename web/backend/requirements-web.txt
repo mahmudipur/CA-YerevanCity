@@ -11,6 +11,7 @@ cryptography==43.0.3    # Fernet — encrypts per-user YC secrets at rest
 itsdangerous==2.2.0     # signs the app session cookie
 slowapi==0.1.9          # rate limiting (login, OTP endpoints)
 argon2-cffi==25.1.0     # password/recovery-code hashing (Argon2id)
+Pillow==12.3.0          # receipt_image_service.py invokes tools/generate_receipt_image.py, same as csv_service.py does for generate_csv.py
 
 # test-only (FastAPI TestClient)
 httpx==0.28.1
