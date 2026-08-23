@@ -38,6 +38,11 @@ fi
 npm run build
 cd "$ROOT_DIR"
 
+# NOTE: Telegram's Login Widget is bound to one exact domain via BotFather's
+# /setdomain — it will NOT work against ngrok's free-tier random subdomain,
+# which changes every restart. This tunnel is fine for testing the rest of
+# the app, but sign-in needs a stable domain (real reverse proxy + DNS) in
+# front of this server, matching TELEGRAM_LOGIN_DOMAIN in .env.
 USE_NGROK="${NGROK:-1}"
 NGROK_PID=""
 SERVER_PID=""

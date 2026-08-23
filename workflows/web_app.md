@@ -15,8 +15,11 @@ terminal.
   (`web/frontend/`), mirroring the terminal's roster → per-item assignment →
   review/edit → summary → payment flow, mobile-first and installable to a
   phone home screen.
-- Both the CLI and the web app read/write the same `.env` and `.tmp/` files,
-  so either can pick up where the other left off.
+- The CLI still reads/writes the shared root `.env` for its own single
+  account. The web app is now **multi-tenant**: each visitor signs in with
+  Telegram and gets their own isolated account (own Yerevan City phone/OTP
+  link, own splits/orders), stored in `.tmp/app.db` (SQLite) with YC secrets
+  encrypted at rest — see "Accounts & login" below.
 
 ## Running it
 
@@ -50,17 +53,46 @@ when you're not on the same WiFi as this machine. It changes every time you
 restart `run.sh` (free ngrok tier doesn't reserve a fixed subdomain). Ctrl-C
 stops both the server and the tunnel together.
 
-**What "public" actually means here**: anyone with that URL can use the full
-app — view/edit past splits, start new ones, trigger a Yerevan City sign-in
-attempt (though completing it still requires the OTP sent to your phone).
-There's no login of the app's own guarding those pages. The URL isn't
-published anywhere and free-tier ngrok subdomains aren't practically
-guessable, but treat the link itself as something not to share. Every
-`split_id`/`order_id` used in a URL is validated against a strict
-alphanumeric/`_`/`-` pattern before it's ever used to build a file path
-(`validate_id()` in `persistence.py`), so a malicious id in a request can't
-reach files outside `.tmp/`. Pass `NGROK=0` to skip the tunnel entirely and
-stay LAN-only.
+**What "public" actually means here**: anyone with that URL now gets a real
+account of their own — every page except `/login` requires a signed-in
+Telegram session (`Depends(get_current_user)` on every router), and every
+session/split/order lookup is scoped to the caller's `telegram_id`, so one
+tenant can't read or mutate another's data by guessing an id (see
+"Accounts & login"). Every `split_id`/`order_id` used in a URL is still
+validated against a strict alphanumeric/`_`/`-` pattern before it's ever
+used to build a file path (`validate_id()` in `persistence.py`).
+
+**Important — Telegram's Login Widget is domain-bound.** BotFather's
+`/setdomain` binds the widget to one exact hostname; it will not work behind
+ngrok's free tier (a new random subdomain every restart). For anything past
+local testing, put a real reverse proxy (Caddy/Nginx) with a stable HTTPS
+domain in front of `run.sh`'s uvicorn process and bind the bot to that
+domain. `TELEGRAM_LOGIN_DOMAIN` in `.env` should always match whatever
+domain is actually serving the app. Pass `NGROK=0` to skip the tunnel
+entirely and stay LAN-only.
+
+## Accounts & login
+
+- Sign-in is the classic Telegram Login Widget (HMAC-SHA256-verified —
+  `app/services/telegram_auth.py`), not OAuth/OIDC. Configure a bot via
+  [@BotFather](https://t.me/BotFather) and set `TELEGRAM_BOT_TOKEN`,
+  `TELEGRAM_BOT_USERNAME`, `TELEGRAM_LOGIN_DOMAIN` in `.env` (see
+  `.env.example`).
+- After Telegram login, each user does a one-time "link my Yerevan City
+  account" step (the same phone+OTP flow as before, now scoped to them —
+  `/api/auth/*` in `routers/auth.py`) before they can fetch orders or save
+  splits.
+- Also generate and set `APP_MASTER_KEY` (encrypts each user's YC
+  phone/device-id/JWT at rest) and `APP_SESSION_SECRET` (signs the app's own
+  session cookie) — commands for both are in `.env.example`.
+- The pre-existing owner account (this repo's original single-tenant `.env`)
+  is migrated once via `python web/backend/scripts/migrate_legacy_env.py`
+  into a reserved `telegram_id=0` row, so the terminal CLI's shared `.env`
+  flow keeps working unmodified. The owner should still sign in via Telegram
+  like everyone else and re-link YC on their real account — see that
+  script's docstring for the full rationale and a `--claim-legacy` shortcut.
+- `send-code`/`verify`/the Telegram callback are all rate-limited
+  (`slowapi`) since the OTP endpoints hit a real third-party API.
 
 ## Development (hot reload)
 
@@ -138,10 +170,17 @@ order cache was deleted separately from the split.
 
 ## Known limitations (v1)
 
-- Session state (the in-progress wizard) lives in memory only. Killing the
-  backend mid-session loses that session's progress — the same as Ctrl-C
-  aborting the terminal CLI mid-flow. The canonical `split_*.json` file is
-  only written once you reach "Confirm & save".
-- No authentication layer of its own — relies on the ngrok URL staying
-  unshared, or on staying LAN-only (`NGROK=0`). See the "public URL" note
-  above.
+- Session state (the in-progress wizard) lives in memory only, per-user. Killing
+  the backend mid-session loses everyone's in-progress sessions — the same as
+  Ctrl-C aborting the terminal CLI mid-flow. The canonical `split_*.json` file
+  is only written once you reach "Confirm & save". This also means the
+  deployment must stay single-process/single-worker; if that ever needs to
+  change, move `session_store.py` into SQLite with a TTL-cleanup job instead.
+- The pre-existing owner's cached order files under `.tmp/order_*.json` (from
+  before multi-tenancy) are not auto-migrated to the new per-user
+  `order_<telegram_id>_<id>.json` naming — they'll simply be re-fetched from
+  Yerevan City the first time they're needed under the new scheme. `.tmp/` is
+  disposable by design (see root `CLAUDE.md`), so this is expected, not a bug.
+- No allowlist/invite gating — any Telegram user can self-register today by
+  design. `services/user_store.get_or_create()` is the single choke point
+  where one could be added later if that changes.
