@@ -94,6 +94,10 @@ export function csvDownloadUrl(splitId: string) {
   return `/api/sessions/${splitId}/csv`
 }
 
+export function receiptImageUrl(splitId: string) {
+  return `/api/sessions/${splitId}/image`
+}
+
 export const receiptApi = {
   getPrompt: () => api.get<{ prompt: string }>('/receipt-prompt'),
 }
