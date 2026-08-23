@@ -10,6 +10,7 @@ sqlalchemy==2.0.52      # users table ORM (sync engine, stdlib sqlite3 driver); 
 cryptography==43.0.3    # Fernet — encrypts per-user YC secrets at rest
 itsdangerous==2.2.0     # signs the app session cookie
 slowapi==0.1.9          # rate limiting (login, OTP endpoints)
+argon2-cffi==25.1.0     # password/recovery-code hashing (Argon2id)
 
 # test-only (FastAPI TestClient)
 httpx==0.28.1
