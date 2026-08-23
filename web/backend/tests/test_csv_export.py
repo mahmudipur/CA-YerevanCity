@@ -5,14 +5,13 @@ import csv
 import json
 
 import pytest
-from fastapi.testclient import TestClient
 
-from conftest import load_fixture_order
+from conftest import TEST_USER_ID, load_fixture_order
 
 from app.config import TMP_DIR
-from app.main import app
 
 SPLIT_ID = "CSV_SMOKE"
+_SCOPED = f"{TEST_USER_ID}_{SPLIT_ID}"
 
 
 @pytest.fixture
@@ -41,16 +40,15 @@ def sample_split():
         "order_meta": {"create_date": "2026-01-01", "status_label": "Delivered", "branch_address": "x",
                        "payment_label": "Card", "is_delivery": False},
     }
-    path = TMP_DIR / f"split_{SPLIT_ID}.json"
+    path = TMP_DIR / f"split_{_SCOPED}.json"
     path.write_text(json.dumps(split_data))
     yield split_data
     path.unlink(missing_ok=True)
-    (TMP_DIR / f"report_{SPLIT_ID}.csv").unlink(missing_ok=True)
+    (TMP_DIR / f"report_{_SCOPED}.csv").unlink(missing_ok=True)
 
 
-def test_csv_download_produces_expected_rows(sample_split):
-    client = TestClient(app)
-    resp = client.get(f"/api/sessions/{SPLIT_ID}/csv")
+def test_csv_download_produces_expected_rows(sample_split, authed_client):
+    resp = authed_client.get(f"/api/sessions/{SPLIT_ID}/csv")
     assert resp.status_code == 200
     text = resp.text.lstrip("﻿")
     rows = list(csv.reader(text.splitlines()))

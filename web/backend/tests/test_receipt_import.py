@@ -1,21 +1,16 @@
 """Bulk item import from AI-extracted receipt JSON, and the prompt endpoint."""
 
-from fastapi.testclient import TestClient
 
-from app.main import app
-
-
-def test_receipt_prompt_endpoint_returns_nonempty_prompt():
-    client = TestClient(app)
-    resp = client.get("/api/receipt-prompt")
+def test_receipt_prompt_endpoint_returns_nonempty_prompt(authed_client):
+    resp = authed_client.get("/api/receipt-prompt")
     assert resp.status_code == 200
     body = resp.json()
     assert "items" in body["prompt"]
     assert "JSON" in body["prompt"]
 
 
-def test_import_items_computes_service_and_net_price():
-    client = TestClient(app)
+def test_import_items_computes_service_and_net_price(authed_client):
+    client = authed_client
     session = client.post("/api/sessions", json={"kind": "manual", "session_name": "Receipt Test"}).json()
     session_id = session["session_id"]
 
@@ -33,26 +28,25 @@ def test_import_items_computes_service_and_net_price():
     assert items[1] == {"name": "Service charge", "price": 500, "service": 0, "net_price": 500, "is_canceled": False}
 
 
-def test_import_rejects_yc_session():
-    client = TestClient(app)
+def test_import_rejects_yc_session(authed_client):
     # kind=yc without a cached order should already 404 at create time in
     # normal use; simulate the guard directly against the import endpoint
     # by using a manual session id that doesn't exist to hit the 404 path,
     # and a real manual session to hit the "wrong kind" 400 is covered by
     # session_store.get raising 404 for unknown ids — check that path here.
-    resp = client.post("/api/sessions/does-not-exist/items/import", json={"items": []})
+    resp = authed_client.post("/api/sessions/does-not-exist/items/import", json={"items": []})
     assert resp.status_code == 404
 
 
-def test_import_empty_items_rejected():
-    client = TestClient(app)
+def test_import_empty_items_rejected(authed_client):
+    client = authed_client
     session = client.post("/api/sessions", json={"kind": "manual", "session_name": "Empty Test"}).json()
     resp = client.post(f"/api/sessions/{session['session_id']}/items/import", json={"items": []})
     assert resp.status_code == 422
 
 
-def test_import_bad_price_rejected():
-    client = TestClient(app)
+def test_import_bad_price_rejected(authed_client):
+    client = authed_client
     session = client.post("/api/sessions", json={"kind": "manual", "session_name": "Bad Price Test"}).json()
     resp = client.post(
         f"/api/sessions/{session['session_id']}/items/import",

@@ -14,6 +14,7 @@ from typing import Literal, Optional
 @dataclass
 class SplitSession:
     session_id: str
+    user_id: int  # owning account's User.id — not necessarily a Telegram id
     kind: Literal["yc", "manual"]
     order_id: Optional[str] = None          # for kind == "yc"
     session_name: Optional[str] = None       # for kind == "manual"

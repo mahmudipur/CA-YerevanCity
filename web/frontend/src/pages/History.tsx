@@ -1,13 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { ArrowDownTrayIcon, PencilSquareIcon } from '@heroicons/react/24/outline'
+import { ArrowDownTrayIcon, PencilSquareIcon, PhotoIcon } from '@heroicons/react/24/outline'
 import { Shell } from '../components/common/Shell'
 import { Spinner } from '../components/common/Spinner'
 import { Card } from '../components/common/Card'
 import { ErrorBanner } from '../components/common/ErrorBanner'
 import { PageTransition } from '../components/common/PageTransition'
-import { historyApi, csvDownloadUrl } from '../api/endpoints'
+import { historyApi, csvDownloadUrl, receiptImageUrl } from '../api/endpoints'
 import { ApiError } from '../api/client'
+import { useShareOrDownload } from '../hooks/useShareOrDownload'
 import { useState } from 'react'
 
 export function History() {
@@ -15,6 +16,7 @@ export function History() {
   const qc = useQueryClient()
   const [error, setError] = useState<string | null>(null)
   const { data, isLoading } = useQuery({ queryKey: ['history'], queryFn: historyApi.list })
+  const { shareOrDownload } = useShareOrDownload()
 
   const edit = useMutation({
     mutationFn: (id: string) => historyApi.edit(id),
@@ -56,6 +58,14 @@ export function History() {
                     className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-full text-text-muted transition-colors hover:bg-[var(--color-surface-muted)] hover:text-primary disabled:opacity-50"
                   >
                     <PencilSquareIcon className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={`Share receipt image for ${row.id}`}
+                    onClick={() => shareOrDownload(receiptImageUrl(row.id), `receipt_${row.id}.png`, 'image/png')}
+                    className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-full text-text-muted transition-colors hover:bg-[var(--color-surface-muted)] hover:text-primary"
+                  >
+                    <PhotoIcon className="h-4 w-4" />
                   </button>
                   <button
                     type="button"

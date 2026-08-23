@@ -4,10 +4,22 @@ credentials.json
 token.json
 __pycache__/
 *.pyc
+.pytest_cache/
 .DS_Store
+
+# Python virtualenvs (any name — this repo has used both .venv/ and .venv-web/)
+.venv/
+.venv-web/
+
+# Claude Code local tooling — machine-specific config, session memory, and a
+# synced marketplace skills cache; none of it is part of this app.
+.claude/
+.remember/
 
 # Web app
 web/frontend/node_modules/
 web/frontend/dist/
-web/backend/.pytest_cache/
-.venv-web/
+# Persistent user accounts DB — real secrets, back this up; NOT disposable
+# like .tmp/, just kept out of git the same way .env is.
+/data/
+web/backend/tests/fixtures/test.db

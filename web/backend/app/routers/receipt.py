@@ -1,7 +1,10 @@
 """Serves the canonical 'paste this into any AI' receipt-scanning prompt, so
 the frontend and this file never drift apart — one source of truth."""
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+
+from ..dependencies import get_current_user
+from ..services.user_store import AuthedUser
 
 router = APIRouter(prefix="/api/receipt-prompt", tags=["receipt"])
 
@@ -27,5 +30,5 @@ Rules:
 
 
 @router.get("")
-def get_receipt_prompt():
+def get_receipt_prompt(user: AuthedUser = Depends(get_current_user)):
     return {"prompt": RECEIPT_PROMPT}

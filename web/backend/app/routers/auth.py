@@ -1,12 +1,19 @@
-"""Web-friendly wrapper around auth_yc.py's 3-step OTP flow (unchanged yc_client calls)."""
+"""Web-friendly wrapper around auth_yc.py's 3-step OTP flow (unchanged
+yc_client calls). This is now "link my Yerevan City account" — a per-user
+step gated behind having already logged into the app via Telegram
+(routers/telegram_auth.py), not the app's login itself.
+"""
 
 import uuid
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
 from .. import sys_path  # noqa: F401
-from ..services import env_store
+from ..dependencies import get_current_user
+from ..rate_limit import limiter
+from ..services import user_store
+from ..services.user_store import AuthedUser
 
 from yc_client import YCError, confirm_code, send_code, verify  # noqa: E402
 
@@ -24,29 +31,26 @@ class VerifyBody(BaseModel):
 
 
 @router.get("/status")
-def status():
-    env_store.reload()
-    token = env_store.get("YC_JWT")
-    phone_e164 = env_store.get("YC_PHONE_E164")
-    phone_local = env_store.get("YC_PHONE_LOCAL")
+def status(user: AuthedUser = Depends(get_current_user)):
     return {
-        "authenticated": bool(token) and token != "nothing",
-        "phone_e164": phone_e164 or None,
-        "phone_local": phone_local or None,
+        "authenticated": user.yc_linked,
+        "phone_e164": user.yc_phone_e164 or None,
+        "phone_local": user.yc_phone_local or None,
     }
 
 
 @router.post("/send-code")
-def send_code_endpoint(body: SendCodeBody):
-    phone_local = (body.phone_local or env_store.get("YC_PHONE_LOCAL")).strip()
-    phone_e164 = (body.phone_e164 or env_store.get("YC_PHONE_E164")).strip()
+@limiter.limit("3/hour")
+def send_code_endpoint(request: Request, body: SendCodeBody, user: AuthedUser = Depends(get_current_user)):
+    phone_local = (body.phone_local or user.yc_phone_local).strip()
+    phone_e164 = (body.phone_e164 or user.yc_phone_e164).strip()
     if not phone_local or not phone_e164:
         raise HTTPException(status_code=422, detail="Phone number is required.")
 
-    device_id = env_store.get("YC_DEVICE_ID")
+    device_id = user.yc_device_id
     if not device_id:
         device_id = uuid.uuid4().hex + "tAyn"  # matches auth_yc.py's format
-        env_store.set("YC_DEVICE_ID", device_id)
+        user_store.set_yc_secrets(user.id, device_id=device_id)
 
     try:
         code = confirm_code()
@@ -58,8 +62,9 @@ def send_code_endpoint(body: SendCodeBody):
 
 
 @router.post("/verify")
-def verify_endpoint(body: VerifyBody):
-    phone_e164 = (body.phone_e164 or env_store.get("YC_PHONE_E164")).strip()
+@limiter.limit("5/10minute")
+def verify_endpoint(request: Request, body: VerifyBody, user: AuthedUser = Depends(get_current_user)):
+    phone_e164 = (body.phone_e164 or user.yc_phone_e164).strip()
     if not phone_e164:
         raise HTTPException(status_code=422, detail="Phone number is required.")
     if len(body.code) != 6 or not body.code.isdigit():
@@ -70,20 +75,15 @@ def verify_endpoint(body: VerifyBody):
     except YCError as e:
         raise HTTPException(status_code=502, detail=f"Verification failed: {e}")
 
-    env_store.set("YC_JWT", jwt)
-    env_store.set("YC_PHONE_E164", phone_e164)
+    user_store.set_yc_secrets(user.id, jwt=jwt, phone_e164=phone_e164)
     return {"authenticated": True}
 
 
 @router.post("/logout")
-def logout():
-    """
-    Clears YC_JWT from .env (the same file/mechanism auth_yc.py writes to).
-    Note this credential is shared with the terminal CLI by design (see
-    workflows/web_app.md) — logging out here also logs the terminal out,
-    and `python tools/auth_yc.py` will be needed there too until either
-    side signs back in. Phone number and device id are left in place so
-    a fresh sign-in doesn't need to re-enter them.
-    """
-    env_store.set("YC_JWT", "")
+def logout(user: AuthedUser = Depends(get_current_user)):
+    """Clears this user's YC JWT only — their app (Telegram) session and
+    phone/device id are left in place so a fresh sign-in doesn't need to
+    re-enter them. Unrelated to /api/auth/telegram/logout, which signs out
+    of the app entirely."""
+    user_store.clear_yc_jwt(user.id)
     return {"authenticated": False}

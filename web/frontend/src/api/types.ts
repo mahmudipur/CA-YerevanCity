@@ -148,3 +148,42 @@ export interface AuthStatus {
   phone_e164: string | null
   phone_local: string | null
 }
+
+export interface TelegramConfig {
+  bot_username: string
+  domain: string
+}
+
+export interface TelegramLoginPayload {
+  id: number
+  first_name: string
+  last_name?: string
+  username?: string
+  photo_url?: string
+  auth_date: number
+  hash: string
+}
+
+/** The account profile returned by every auth endpoint (/me, Telegram
+ * callback/link, signup/login/forgot-password) — Telegram and
+ * username/password are independent, linkable ways into the same account. */
+export interface UserProfile {
+  id: number
+  telegram_id: number | null
+  telegram_username: string | null
+  username: string | null
+  first_name: string
+  last_name: string | null
+  photo_url: string | null
+  email: string | null
+  has_password: boolean
+  has_recovery_code: boolean
+  telegram_linked: boolean
+  yc_linked: boolean
+}
+
+/** Signup/forgot-password responses include this once — the UI must force
+ * the user to acknowledge saving it before moving on. */
+export interface RecoveryCodeResponse extends UserProfile {
+  recovery_code: string
+}

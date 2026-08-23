@@ -57,14 +57,15 @@ This loop is how the framework improves over time.
 
 **Directory layout:**
 ```
-.tmp/           # Temporary files (scraped data, intermediate exports). Regenerated as needed.
+.tmp/           # Currently empty/unused — reserved for genuinely disposable future scratch files.
+data/           # Real records: every split_*/order_*/report_* file (CLI + web app), and the web app's users SQLite DB. NOT disposable — never rm -rf this, back it up.
 tools/          # Python scripts for deterministic execution
 workflows/      # Markdown SOPs defining what to do and how
 .env            # API keys and environment variables (NEVER store secrets anywhere else)
 credentials.json, token.json  # Google OAuth (gitignored)
 ```
 
-**Core principle:** Local files are just for processing. Anything I need to see or use lives in cloud services. Everything in `.tmp/` is disposable.
+**Core principle:** Local files are just for processing, EXCEPT `data/` — a past split has no other copy anywhere (no automatic cloud export happens), so it is real data, not an intermediate. Never treat a `.json`/`.csv`/`.db` file as disposable just because it lives next to disposable ones — check `data/` vs `.tmp/` specifically before deleting anything.
 
 ## Bottom Line
 

@@ -1,17 +1,19 @@
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate, useParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { CheckCircleIcon, ArrowDownTrayIcon } from '@heroicons/react/24/solid'
+import { CheckCircleIcon, ArrowDownTrayIcon, PhotoIcon } from '@heroicons/react/24/solid'
 import { Shell } from '../components/common/Shell'
 import { Card } from '../components/common/Card'
 import { Button } from '../components/common/Button'
 import { Spinner } from '../components/common/Spinner'
 import { PageTransition } from '../components/common/PageTransition'
-import { sessionsApi, csvDownloadUrl } from '../api/endpoints'
+import { sessionsApi, csvDownloadUrl, receiptImageUrl } from '../api/endpoints'
+import { useShareOrDownload } from '../hooks/useShareOrDownload'
 
 export function Done() {
   const { sessionId = '' } = useParams()
   const navigate = useNavigate()
+  const { shareOrDownload, isPending: sharePending } = useShareOrDownload()
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['save', sessionId],
@@ -50,6 +52,15 @@ export function Done() {
         </motion.div>
 
         <div className="space-y-3">
+          <Button
+            fullWidth
+            variant="secondary"
+            icon={<PhotoIcon className="h-4 w-4" />}
+            loading={sharePending}
+            onClick={() => shareOrDownload(receiptImageUrl(data.split_id), `receipt_${data.split_id}.png`, 'image/png')}
+          >
+            Share / save receipt image
+          </Button>
           <Button fullWidth variant="secondary" icon={<ArrowDownTrayIcon className="h-4 w-4" />} onClick={() => window.open(csvDownloadUrl(data.split_id), '_blank')}>
             Download CSV
           </Button>

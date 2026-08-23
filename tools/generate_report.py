@@ -26,7 +26,7 @@ from dotenv import load_dotenv, set_key
 
 ROOT     = Path(__file__).parent.parent
 ENV_PATH = ROOT / ".env"
-TMP_DIR  = ROOT / ".tmp"
+TMP_DIR  = ROOT / "data"
 
 SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",

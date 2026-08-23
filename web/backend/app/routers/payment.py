@@ -1,9 +1,11 @@
 from typing import Literal
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
+from ..dependencies import get_current_user
 from ..services import payment_service, persistence, session_store
+from ..services.user_store import AuthedUser
 
 router = APIRouter(prefix="/api/sessions", tags=["payment"])
 
@@ -17,8 +19,8 @@ class PaymentBody(BaseModel):
 
 
 @router.post("/{session_id}/payment")
-def set_payment(session_id: str, body: PaymentBody):
-    session = session_store.get(session_id)
+def set_payment(session_id: str, body: PaymentBody, user: AuthedUser = Depends(get_current_user)):
+    session = session_store.get(session_id, user.id)
     if session.totals is None:
         raise HTTPException(status_code=422, detail="Finish assigning items before setting payment info.")
 
@@ -39,8 +41,8 @@ def set_payment(session_id: str, body: PaymentBody):
 
 
 @router.post("/{session_id}/save")
-def save(session_id: str):
-    session = session_store.get(session_id)
+def save(session_id: str, user: AuthedUser = Depends(get_current_user)):
+    session = session_store.get(session_id, user.id)
     if session.totals is None or session.currency is None:
         raise HTTPException(status_code=422, detail="Finish the split and set payment info before saving.")
 
@@ -97,6 +99,6 @@ def save(session_id: str):
             },
         }
 
-    saved_path = persistence.save_split(split_id, split_data)
+    saved_path = persistence.save_split(user.id, split_id, split_data)
     session.saved_path = saved_path
     return {"split_id": split_id, "saved_path": saved_path, "split": split_data}

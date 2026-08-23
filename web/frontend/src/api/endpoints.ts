@@ -7,13 +7,39 @@ import type {
   ItemDetailResponse,
   Order,
   OrderSummary,
+  RecoveryCodeResponse,
   ReviewResponse,
   SaveResponse,
   SessionView,
   SplitMode,
+  TelegramConfig,
+  TelegramLoginPayload,
+  UserProfile,
 } from './types'
 
 export const authApi = {
+  // App-level login, method 1: Telegram — only shown when telegramConfig
+  // returns a real bot_username.
+  telegramConfig: () => api.get<TelegramConfig>('/auth/telegram/config'),
+  telegramCallback: (payload: TelegramLoginPayload) =>
+    api.post<UserProfile>('/auth/telegram/callback', payload),
+  telegramLink: (payload: TelegramLoginPayload) => api.post<UserProfile>('/auth/telegram/link', payload),
+  telegramLogout: () => api.post<{ signed_out: boolean }>('/auth/telegram/logout'),
+  me: () => api.get<UserProfile>('/auth/me'),
+
+  // App-level login, method 2: username/password — always available, since
+  // it needs no fixed domain and no mail/SMS capability.
+  signup: (body: { username: string; password: string; display_name?: string; email?: string }) =>
+    api.post<RecoveryCodeResponse>('/auth/signup', body),
+  login: (username: string, password: string) =>
+    api.post<UserProfile>('/auth/login', { username, password }),
+  forgotPassword: (body: { username: string; recovery_code: string; new_password: string }) =>
+    api.post<RecoveryCodeResponse>('/auth/forgot-password', body),
+  regenerateRecoveryCode: () => api.post<{ recovery_code: string }>('/auth/regenerate-recovery-code'),
+  setPassword: (username: string, password: string) =>
+    api.post<{ recovery_code: string }>('/auth/set-password', { username, password }),
+
+  // Per-user "link my Yerevan City account" OTP flow.
   status: () => api.get<AuthStatus>('/auth/status'),
   sendCode: (phone_local?: string, phone_e164?: string) =>
     api.post<{ sent: boolean; phone_e164: string }>('/auth/send-code', { phone_local, phone_e164 }),
@@ -66,6 +92,10 @@ export const historyApi = {
 
 export function csvDownloadUrl(splitId: string) {
   return `/api/sessions/${splitId}/csv`
+}
+
+export function receiptImageUrl(splitId: string) {
+  return `/api/sessions/${splitId}/image`
 }
 
 export const receiptApi = {

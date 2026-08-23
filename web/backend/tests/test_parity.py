@@ -9,13 +9,13 @@ import json
 import pytest
 from fastapi.testclient import TestClient
 
-from conftest import FIXTURE_PATH, load_fixture_order
+from conftest import FIXTURE_PATH, TEST_USER_ID, load_fixture_order
 
 from app.config import TMP_DIR
 from app.main import app
-from app.services import env_store
 
 ORDER_ID = "FIXTURE"
+_SCOPED = f"{TEST_USER_ID}_{ORDER_ID}"
 PARTICIPANTS = ["Alice", "Bob", "Carol"]
 
 # (mode, selected, values) per active item, applied identically on both paths.
@@ -29,17 +29,11 @@ SCRIPT = [
 @pytest.fixture
 def cached_order():
     order = load_fixture_order()
-    path = TMP_DIR / f"order_{ORDER_ID}.json"
+    path = TMP_DIR / f"order_{_SCOPED}.json"
     path.write_text(json.dumps(order))
     yield order
     path.unlink(missing_ok=True)
-    (TMP_DIR / f"split_{ORDER_ID}.json").unlink(missing_ok=True)
-
-
-@pytest.fixture
-def fixed_roster(monkeypatch):
-    monkeypatch.setattr(env_store, "reload", lambda: None)
-    monkeypatch.setenv("DEFAULT_PARTICIPANTS", ",".join(PARTICIPANTS))
+    (TMP_DIR / f"split_{_SCOPED}.json").unlink(missing_ok=True)
 
 
 def _expected_split(order: dict) -> dict:
@@ -81,7 +75,8 @@ def _strip_timestamp(split: dict) -> dict:
     return {k: v for k, v in split.items() if k != "split_date"}
 
 
-def test_web_wizard_matches_direct_calculation(cached_order, fixed_roster):
+def test_web_wizard_matches_direct_calculation(cached_order, authed_user_factory):
+    authed_user_factory(default_participants=",".join(PARTICIPANTS))
     expected = _expected_split(cached_order)
 
     client = TestClient(app)

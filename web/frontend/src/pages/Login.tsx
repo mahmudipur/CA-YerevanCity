@@ -1,169 +1,117 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useNavigate } from 'react-router-dom'
-import { ArrowRightOnRectangleIcon, CheckCircleIcon } from '@heroicons/react/24/outline'
+import { Link, useNavigate } from 'react-router-dom'
 import { Shell } from '../components/common/Shell'
 import { Card } from '../components/common/Card'
 import { Button } from '../components/common/Button'
 import { Spinner } from '../components/common/Spinner'
 import { ErrorBanner } from '../components/common/ErrorBanner'
-import { PhoneInput } from '../components/common/PhoneInput'
+import { PageTransition } from '../components/common/PageTransition'
 import { authApi } from '../api/endpoints'
 import { ApiError } from '../api/client'
-import { PageTransition } from '../components/common/PageTransition'
-import { COUNTRY_CODES, DEFAULT_COUNTRY } from '../data/countryCodes'
-
-function detectCountryCode(e164?: string | null): string {
-  if (!e164) return DEFAULT_COUNTRY.code
-  const match = COUNTRY_CODES.find((c) => e164.startsWith(c.code))
-  return match?.code ?? DEFAULT_COUNTRY.code
-}
+import { useAuthStore } from '../store/authStore'
+import { useTelegramWidget } from '../hooks/useTelegramWidget'
+import type { TelegramLoginPayload, UserProfile } from '../api/types'
 
 export function Login() {
   const navigate = useNavigate()
   const qc = useQueryClient()
-  const { data: status, isLoading: statusLoading } = useQuery({ queryKey: ['auth-status'], queryFn: authApi.status })
-
-  // Always start on the phone step — never assume a code was already sent
-  // just because a phone number happens to be on file.
-  const [phase, setPhase] = useState<'phone' | 'otp'>('phone')
-  const [countryCode, setCountryCode] = useState(() => detectCountryCode(status?.phone_e164))
-  const [national, setNational] = useState(status?.phone_local ?? '')
-  const [code, setCode] = useState('')
+  const setUser = useAuthStore((s) => s.setUser)
   const [error, setError] = useState<string | null>(null)
-  const [sentTo, setSentTo] = useState('')
+  const [username, setUsername] = useState('')
+  const [password, setPassword] = useState('')
 
-  const fullPhone = `${countryCode}${national}`
-
-  const sendCode = useMutation({
-    mutationFn: () => authApi.sendCode(national || undefined, fullPhone),
-    onSuccess: (res) => {
-      setError(null)
-      setSentTo(res.phone_e164)
-      setPhase('otp')
-    },
-    onError: (e) => setError(e instanceof ApiError ? e.message : 'Failed to send code.'),
+  // bot_username empty/missing -> Telegram login isn't configured; the
+  // widget section is skipped entirely (no error, no broken button) and
+  // username/password is the only option shown.
+  const { data: config } = useQuery({
+    queryKey: ['telegram-config'],
+    queryFn: authApi.telegramConfig,
   })
+  const telegramConfigured = Boolean(config?.bot_username)
 
-  const verify = useMutation({
-    mutationFn: () => authApi.verify(code, sentTo),
-    onSuccess: async () => {
-      setError(null)
-      await qc.invalidateQueries({ queryKey: ['auth-status'] })
-      navigate('/', { replace: true })
-    },
-    onError: (e) => setError(e instanceof ApiError ? e.message : 'Verification failed.'),
-  })
-
-  const logout = useMutation({
-    mutationFn: () => authApi.logout(),
-    onSuccess: async () => {
-      setError(null)
-      await qc.invalidateQueries({ queryKey: ['auth-status'] })
-    },
-    onError: (e) => setError(e instanceof ApiError ? e.message : 'Could not sign out.'),
-  })
-
-  if (statusLoading) {
-    return (
-      <Shell title="Sign in" subtitle="Yerevan City">
-        <Spinner />
-      </Shell>
-    )
+  const afterLogin = (user: UserProfile) => {
+    // Synchronous cache write, not invalidate-and-refetch — see Menu.tsx's
+    // sign-out handler for why an async refetch here would race navigate().
+    setError(null)
+    setUser(user)
+    qc.setQueryData(['auth-me'], user)
+    navigate(user.yc_linked ? '/' : '/link-yc', { replace: true })
   }
 
-  if (status?.authenticated) {
-    return (
-      <Shell title="Sign in" subtitle="Yerevan City">
-        <PageTransition>
-          <ErrorBanner message={error} />
-          <Card className="text-center">
-            <CheckCircleIcon className="mx-auto mb-2 h-10 w-10 text-primary" />
-            <p className="font-display text-lg">You're signed in</p>
-            {status.phone_e164 && <p className="mb-4 text-sm text-text-muted">{status.phone_e164}</p>}
-            <div className="space-y-2">
-              <Button fullWidth onClick={() => navigate('/orders')}>
-                Continue
-              </Button>
-              <Button
-                fullWidth
-                variant="secondary"
-                icon={<ArrowRightOnRectangleIcon className="h-4 w-4" />}
-                loading={logout.isPending}
-                onClick={() => logout.mutate()}
-              >
-                Sign out
-              </Button>
-            </div>
-            <p className="mt-3 text-xs text-text-muted">
-              This account is shared with the terminal app — signing out here also signs the terminal out.
-            </p>
-          </Card>
-        </PageTransition>
-      </Shell>
-    )
-  }
+  const telegramCallback = useMutation({
+    mutationFn: (payload: TelegramLoginPayload) => authApi.telegramCallback(payload),
+    onSuccess: afterLogin,
+    onError: (e) => setError(e instanceof ApiError ? e.message : 'Telegram sign-in failed.'),
+  })
+
+  const passwordLogin = useMutation({
+    mutationFn: () => authApi.login(username.trim(), password),
+    onSuccess: afterLogin,
+    onError: (e) => setError(e instanceof ApiError ? e.message : 'Sign-in failed.'),
+  })
+
+  const widgetRef = useTelegramWidget(config?.bot_username, (user) => telegramCallback.mutate(user))
 
   return (
-    <Shell title="Sign in" subtitle="Yerevan City">
+    <Shell title="Sign in" subtitle="Yerevan City Split">
       <PageTransition>
+        <ErrorBanner message={error} />
+
+        {telegramConfigured && (
+          <Card className="mb-4 text-center">
+            {telegramCallback.isPending ? <Spinner /> : <div ref={widgetRef} className="flex justify-center" />}
+          </Card>
+        )}
+
+        {telegramConfigured && (
+          <div className="my-4 flex items-center gap-3 text-xs text-text-muted">
+            <div className="h-px flex-1 bg-[var(--color-border)]" />
+            or
+            <div className="h-px flex-1 bg-[var(--color-border)]" />
+          </div>
+        )}
+
         <Card>
-          <ErrorBanner message={error} />
-          {phase === 'phone' ? (
-            <form
-              onSubmit={(e) => {
-                e.preventDefault()
-                sendCode.mutate()
-              }}
-              className="space-y-3"
-            >
-              <label className="block">
-                <span className="mb-1.5 block text-sm font-medium text-text-muted">Phone number</span>
-                <PhoneInput
-                  countryCode={countryCode}
-                  national={national}
-                  onCountryChange={setCountryCode}
-                  onNationalChange={setNational}
-                  disabled={sendCode.isPending}
-                />
-                <span className="mt-1.5 block text-xs text-text-muted">We'll text a code to {fullPhone || '…'}</span>
-              </label>
-              <Button type="submit" fullWidth loading={sendCode.isPending} disabled={national.length < 6}>
-                Send code
-              </Button>
-            </form>
-          ) : (
-            <form
-              onSubmit={(e) => {
-                e.preventDefault()
-                verify.mutate()
-              }}
-              className="space-y-3"
-            >
-              <p className="text-sm text-text-muted">SMS sent to {sentTo}. Enter the 6-digit code.</p>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault()
+              passwordLogin.mutate()
+            }}
+            className="space-y-3"
+          >
+            <label className="block">
+              <span className="mb-1.5 block text-sm font-medium text-text-muted">Username</span>
               <input
-                type="text"
-                inputMode="numeric"
-                autoComplete="one-time-code"
-                maxLength={6}
-                autoFocus
-                value={code}
-                onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
-                placeholder="123456"
-                className="min-h-11 w-full rounded-xl border border-[var(--color-border)] bg-transparent px-3.5 py-2.5 text-center font-mono-num text-lg tracking-[0.4em] outline-none"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                autoComplete="username"
+                autoFocus={!telegramConfigured}
+                className="min-h-11 w-full rounded-xl border border-[var(--color-border)] bg-transparent px-3.5 py-2.5 outline-none"
               />
-              <Button type="submit" fullWidth loading={verify.isPending} disabled={code.length !== 6}>
-                Verify
-              </Button>
-              <button
-                type="button"
-                onClick={() => setPhase('phone')}
-                className="w-full cursor-pointer text-center text-sm text-text-muted hover:text-text"
-              >
-                Change phone number
-              </button>
-            </form>
-          )}
+            </label>
+            <label className="block">
+              <span className="mb-1.5 block text-sm font-medium text-text-muted">Password</span>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                autoComplete="current-password"
+                className="min-h-11 w-full rounded-xl border border-[var(--color-border)] bg-transparent px-3.5 py-2.5 outline-none"
+              />
+            </label>
+            <Button type="submit" fullWidth loading={passwordLogin.isPending} disabled={!username || !password}>
+              Sign in
+            </Button>
+            <div className="flex items-center justify-between text-xs">
+              <Link to="/signup" className="text-accent hover:underline">
+                Create an account
+              </Link>
+              <Link to="/forgot-password" className="text-text-muted hover:underline">
+                Forgot password?
+              </Link>
+            </div>
+          </form>
         </Card>
       </PageTransition>
     </Shell>

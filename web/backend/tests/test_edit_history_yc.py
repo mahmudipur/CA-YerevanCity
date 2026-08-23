@@ -4,20 +4,19 @@ from the cached order_{id}.json alongside the saved split_{id}.json."""
 import json
 
 import pytest
-from fastapi.testclient import TestClient
 
-from conftest import load_fixture_order
+from conftest import TEST_USER_ID, load_fixture_order
 
 from app.config import TMP_DIR
-from app.main import app
 
 ORDER_ID = "FIXTURE"
+_SCOPED = f"{TEST_USER_ID}_{ORDER_ID}"
 
 
 @pytest.fixture
 def cached_order_and_split():
     order = load_fixture_order()
-    order_path = TMP_DIR / f"order_{ORDER_ID}.json"
+    order_path = TMP_DIR / f"order_{_SCOPED}.json"
     order_path.write_text(json.dumps(order))
 
     participants = ["Alice", "Bob"]
@@ -42,15 +41,15 @@ def cached_order_and_split():
                        "branch_address": order["branch_address"], "payment_label": order["payment_label"],
                        "is_delivery": order["is_delivery"]},
     }
-    split_path = TMP_DIR / f"split_{ORDER_ID}.json"
+    split_path = TMP_DIR / f"split_{_SCOPED}.json"
     split_path.write_text(json.dumps(split_data))
     yield split_data
     order_path.unlink(missing_ok=True)
     split_path.unlink(missing_ok=True)
 
 
-def test_edit_yc_split_reconstructs_order_and_resaves(cached_order_and_split):
-    client = TestClient(app)
+def test_edit_yc_split_reconstructs_order_and_resaves(cached_order_and_split, authed_client):
+    client = authed_client
 
     edit_resp = client.post(f"/api/history/{ORDER_ID}/edit")
     assert edit_resp.status_code == 200, edit_resp.text
@@ -72,4 +71,4 @@ def test_edit_yc_split_reconstructs_order_and_resaves(cached_order_and_split):
     save_resp = client.post(f"/api/sessions/{session_id}/save")
     assert save_resp.status_code == 200, save_resp.text
     assert save_resp.json()["split_id"] == ORDER_ID
-    assert len(list(TMP_DIR.glob(f"split_{ORDER_ID}*.json"))) == 1
+    assert len(list(TMP_DIR.glob(f"split_{_SCOPED}*.json"))) == 1
