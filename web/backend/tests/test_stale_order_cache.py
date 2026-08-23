@@ -8,10 +8,26 @@ import json
 
 import pytest
 
+from conftest import TEST_TELEGRAM_ID
 from app.config import TMP_DIR
 from app.services import yc_adapter
+from app.services.user_store import AuthedUser
 
 ORDER_ID = "STALE_CACHE_TEST"
+
+FAKE_USER = AuthedUser(
+    telegram_id=TEST_TELEGRAM_ID,
+    telegram_username=None,
+    first_name="Test",
+    last_name=None,
+    photo_url=None,
+    default_participants="Me",
+    google_sheet_id=None,
+    yc_phone_local="",
+    yc_phone_e164="",
+    yc_device_id="",
+    yc_jwt="fake-jwt",
+)
 
 
 @pytest.fixture
@@ -37,7 +53,7 @@ def old_shaped_cache():
              "total_price": 1000, "discount": 0, "net_price": 1000, "is_canceled": False},
         ],
     }
-    path = TMP_DIR / f"order_{ORDER_ID}.json"
+    path = TMP_DIR / f"order_{TEST_TELEGRAM_ID}_{ORDER_ID}.json"
     path.write_text(json.dumps(order))
     yield path
     path.unlink(missing_ok=True)
@@ -45,9 +61,6 @@ def old_shaped_cache():
 
 def test_pre_image_field_cache_is_treated_as_stale(old_shaped_cache, monkeypatch):
     refetched = {"called": False}
-
-    def fake_token():
-        return "fake-token"
 
     def fake_get_order_detail(token, order_id, created_on):
         refetched["called"] = True
@@ -60,11 +73,10 @@ def test_pre_image_field_cache_is_treated_as_stale(old_shaped_cache, monkeypatch
                  "userDeliveryFee": 0, "serviceFee": 0, "driverTipAmount": 0, "status": 7,
                  "isDelivery": False, "paymentMethod": 2, "branchAddress": {"address": "x"}}]
 
-    monkeypatch.setattr(yc_adapter, "_token", fake_token)
     monkeypatch.setattr(yc_adapter, "get_order_detail", fake_get_order_detail)
     monkeypatch.setattr(yc_adapter, "get_orders", fake_get_orders)
 
-    order = yc_adapter.fetch_and_cache_order(order_id=ORDER_ID, refresh=False)
+    order = yc_adapter.fetch_and_cache_order(FAKE_USER, order_id=ORDER_ID, refresh=False)
 
     assert refetched["called"], "stale (pre-image-field) cache should have triggered a re-fetch"
     assert order["items"][0]["image"] == "https://example.com/photo.png"

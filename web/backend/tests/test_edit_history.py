@@ -4,12 +4,13 @@ changed, and re-saved to the SAME split_{id}.json (not a duplicate)."""
 import json
 
 import pytest
-from fastapi.testclient import TestClient
+
+from conftest import TEST_TELEGRAM_ID
 
 from app.config import TMP_DIR
-from app.main import app
 
 SPLIT_ID = "edit_smoke_cafe"  # must equal slugify(session_name) below — that's the real invariant manual_split.py relies on
+_SCOPED = f"{TEST_TELEGRAM_ID}_{SPLIT_ID}"
 
 
 @pytest.fixture
@@ -36,14 +37,14 @@ def sample_manual_split():
         "order_meta": {"create_date": "2026-01-01", "status_label": "Manual", "branch_address": "Edit Smoke Cafe",
                        "payment_label": "Cash", "is_delivery": False},
     }
-    path = TMP_DIR / f"split_{SPLIT_ID}.json"
+    path = TMP_DIR / f"split_{_SCOPED}.json"
     path.write_text(json.dumps(split_data))
     yield split_data
     path.unlink(missing_ok=True)
 
 
-def test_edit_and_resave_overwrites_same_file(sample_manual_split):
-    client = TestClient(app)
+def test_edit_and_resave_overwrites_same_file(sample_manual_split, authed_client):
+    client = authed_client
 
     edit_resp = client.post(f"/api/history/{SPLIT_ID}/edit")
     assert edit_resp.status_code == 200, edit_resp.text
@@ -72,9 +73,9 @@ def test_edit_and_resave_overwrites_same_file(sample_manual_split):
 
     # Same split id/file, not a new one.
     assert saved["split_id"] == SPLIT_ID
-    assert saved["saved_path"] == str(TMP_DIR / f"split_{SPLIT_ID}.json")
+    assert saved["saved_path"] == str(TMP_DIR / f"split_{_SCOPED}.json")
 
-    on_disk = json.loads((TMP_DIR / f"split_{SPLIT_ID}.json").read_text())
+    on_disk = json.loads((TMP_DIR / f"split_{_SCOPED}.json").read_text())
     assert on_disk["totals"]["Alice"]["total"] == 1500  # 500 (coffee) + 1000 (cake half)
     assert on_disk["totals"]["Bob"]["total"] == 1500
-    assert len(list(TMP_DIR.glob(f"split_{SPLIT_ID}*.json"))) == 1
+    assert len(list(TMP_DIR.glob(f"split_{_SCOPED}*.json"))) == 1
