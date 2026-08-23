@@ -5,12 +5,13 @@ from fastapi import HTTPException
 
 from ..config import TMP_DIR
 from . import persistence, session_store
+from .persistence import scoped_id
 
 ASSIGNMENT_KEYS = ("assignments", "assignment_weights", "split_method")
 
 
-def start_edit(split_id: str):
-    split = persistence.load_split(split_id)
+def start_edit(telegram_id: int, split_id: str):
+    split = persistence.load_split(telegram_id, split_id)
     is_manual = "session_name" in split
 
     raw_items = []
@@ -23,13 +24,15 @@ def start_edit(split_id: str):
 
     if is_manual:
         session = session_store.create(
+            telegram_id,
             kind="manual",
             session_name=split.get("session_name", split_id),
             items=raw_items,
         )
     else:
-        order = _reconstruct_order(split_id, split)
+        order = _reconstruct_order(telegram_id, split_id, split)
         session = session_store.create(
+            telegram_id,
             kind="yc",
             order_id=split_id,
             order=order,
@@ -41,15 +44,15 @@ def start_edit(split_id: str):
     session.fee_allocations = split.get("fee_allocations")
     session.totals = split.get("totals")
     session.currency = split.get("currency")
-    session.saved_path = str(TMP_DIR / f"split_{split_id}.json")
+    session.saved_path = str(TMP_DIR / f"split_{scoped_id(telegram_id, split_id)}.json")
     return session
 
 
-def _reconstruct_order(split_id: str, split: dict) -> dict:
+def _reconstruct_order(telegram_id: int, split_id: str, split: dict) -> dict:
     """Prefer the real cached order_{id}.json (exact original shape); fall
     back to rebuilding the fields split_basket.py's output actually needs
     from the split JSON itself if the order cache is missing."""
-    cached_path = TMP_DIR / f"order_{split_id}.json"
+    cached_path = TMP_DIR / f"order_{scoped_id(telegram_id, split_id)}.json"
     if cached_path.exists():
         import json
         return json.loads(cached_path.read_text())
